@@ -436,10 +436,7 @@ def get_sessions_by_user_id(
             # 获取查询结果
             rows = cur.fetchall()
             if not rows:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="No sessions found for the given user ID"
-                )
+                return []
 
             # 构造返回结果，并查找每个 session_id 对应的 session_desc
             sessions = []
@@ -512,12 +509,9 @@ async def get_conversations(
         cur.execute(session_check_query, (session_id,))
         result = cur.fetchone()
 
-        # 如果查询不到 session_id，返回 404 Not Found
+        # 如果查询不到 session_id，返回空
         if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found."
-            )
+            return []
         session_user_id = result[0]  # 获取查询到的 user_id
 
         # 比对 session_id 对应的 user_id 和 请求的 user_id 是否一致
@@ -543,10 +537,7 @@ async def get_conversations(
         rows = cur.fetchall()  # 获取所有查询结果
 
         if not rows:
-            raise HTTPException(
-                status_code=404,
-                detail="No conversations found for the given session_id"
-            )
+            return []
 
         # 转换查询结果为 Pydantic 模型列表
         conversations = [
@@ -608,10 +599,7 @@ async def delete_session(
         result = cur.fetchone()
 
         if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found."
-            )
+            return []
 
         # 确认 session 属于请求的 user_id
         session_user_id = result[0]
@@ -680,10 +668,7 @@ async def update_session_name(
         result = cur.fetchone()
 
         if not result:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Session not found."
-            )
+            return []
 
         # 确认 session 属于请求的 user_id
         session_user_id = result[0]
