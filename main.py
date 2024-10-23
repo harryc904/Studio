@@ -67,6 +67,7 @@ class UserInDB(User):
 
 class SessionCreateRequest(BaseModel):
     user_id: int
+    session_name: Optional[str] = None
 
 # 定义模型，用于验证和处理请求数据
 class ConversationCreateRequest(BaseModel):
@@ -260,11 +261,19 @@ async def logout():
 @app.post("/sessions")
 def create_session(request: SessionCreateRequest, current_user: UserInDB = Depends(get_current_user)):
     logger.info("Creating a session for user_id: %s", request.user_id)
+
     # 验证请求中的 user_id 是否与当前登录的用户一致
     if current_user.user_id != request.user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="User ID does not match the authenticated user's ID",
+        )
+
+    # 检查 request 数据的完整性
+    if not request.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="User ID is required",
         )
 
     conn = None
@@ -274,8 +283,8 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
         with conn.cursor() as cur:
             # 获取当前时间作为 start_time
             start_time = datetime.now()
-            # 生成 session_name，格式为 YYYYMMDDHHMMSS
-            session_name = start_time.strftime("%Y%m%d%H%M%S")
+             # 如果 session_name 没有传入，则生成默认的名称
+            session_name = request.session_name if request.session_name else start_time.strftime("%Y%m%d%H%M%S")
 
             # 插入新的会话数据到 sessions 表
             insert_query = sql.SQL("""
@@ -301,7 +310,7 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
             else:
                 raise HTTPException(status_code=500, detail="Failed to create session")
     except Exception as e:
-        print(f"Error creating session: {e}")
+        logger.error(f"Error creating session: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         if conn:
@@ -400,7 +409,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         else:
             raise HTTPException(status_code=500, detail="Failed to create conversation")
     except Exception as e:
-        print(f"Error creating conversation: {e}")
+        logger.error(f"Error creating conversation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     finally:
         if conn:
@@ -564,7 +573,7 @@ async def get_conversations(
         raise http_exc
 
     except Exception as e:
-        print(f"Error querying conversations: {e}")
+        logger.error(f"Error querying conversations: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
     finally:
