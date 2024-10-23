@@ -269,13 +269,6 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
             detail="User ID does not match the authenticated user's ID",
         )
 
-    # 检查 request 数据的完整性
-    if not request.user_id:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User ID is required",
-        )
-
     conn = None
     try:
         # 获取数据库连接
