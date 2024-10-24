@@ -16,6 +16,8 @@ import asyncpg
 import logging
 import json
 
+
+
 # 初始化 logging 配置
 logging.basicConfig(
     filename='/home/lighthouse/studio/debuglog/backend.log',  # 输出日志的文件
