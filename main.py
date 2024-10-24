@@ -328,7 +328,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         created_at = datetime.now()  # 获取当前时间
 
         # 处理可选字段的默认值
-        conversation_id = request.conversation_id or str(uuid.uuid4())  # 生成UUID（如果为空）
+        conversation_id = str(request.conversation_id or uuid.uuid4())  # 转换 UUID 为字符串
         conversation_child_version = None
 
         # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
@@ -337,7 +337,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 # 查询父级对话的当前 conversation_child_version
                 cur.execute(
                     "SELECT conversation_child_version FROM conversations WHERE conversation_id = %s",
-                    (str(request.conversation_parent_id),)
+                    (str(request.conversation_parent_id),)  # 转换 UUID 为字符串
                 )
                 parent_record = cur.fetchone()
                 if parent_record:
@@ -349,13 +349,13 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                         child_versions = {}
 
                     # 更新子版本信息
-                    child_versions[str(request.version)] = str(conversation_id)
+                    child_versions[str(request.version)] = conversation_id
                     conversation_child_version = json.dumps(child_versions)
 
                     # 更新父级 conversation 的 conversation_child_version
                     cur.execute(
                         "UPDATE conversations SET conversation_child_version = %s WHERE conversation_id = %s",
-                        (conversation_child_version, str(request.conversation_parent_id))
+                        (conversation_child_version, str(request.conversation_parent_id))  # 转换 UUID 为字符串
                     )
 
         # 准备插入语句
@@ -385,13 +385,13 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
             cur.execute(
                 insert_query,
                 (
-                    conversation_id,             # 处理后的 UUID
+                    conversation_id,             # 处理后的 UUID（字符串形式）
                     request.session_id,          # 会话ID
                     created_at,                  # 当前时间
                     request.conversation_type,   # 对话类型
                     request.content,             # 文本内容
                     request.version,             # 版本
-                    request.conversation_parent_id,  # 父对话 ID（如果存在）
+                    str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
                     conversation_child_version,  # 更新后的子版本信息
                     request.dify_func_def,       # 可选字段 dify_func_def
                     request.dify_func_des,       # 可选字段 dify_func_des
