@@ -365,7 +365,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                         version = 1
 
                     # 更新子版本信息
-                    child_versions[str(request.version)] = conversation_id
+                    child_versions[str(version)] = conversation_id
                     conversation_child_version = json.dumps(child_versions)  # 将字典转换回 JSON 字符串
                     logger.info("Updated conversation_child_version: %s", conversation_child_version)
 
