@@ -313,7 +313,7 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
 @app.post("/conversations")
 async def create_conversation(request: ConversationCreateRequest, current_user: UserInDB = Depends(get_current_user)):
     logger.info("User %s is creating a conversation for session_id: %s", current_user.user_id, request.session_id)
-    
+
     # 验证请求中的 user_id 是否与当前登录的用户一致
     if current_user.user_id != request.user_id:
         raise HTTPException(
@@ -325,10 +325,15 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
     try:
         # 获取数据库连接
         conn = get_db_connection()
+        logger.info("Database connection established")
+
         created_at = datetime.now()  # 获取当前时间
+        logger.info("Current timestamp: %s", created_at)
 
         # 处理可选字段的默认值
         conversation_id = str(request.conversation_id or uuid.uuid4())  # 转换 UUID 为字符串
+        logger.info("Generated conversation ID: %s", conversation_id)
+
         conversation_child_version = None
 
         # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
@@ -347,8 +352,11 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     logger.info("Existing child version type: %s, value: %s", type(existing_child_version), existing_child_version)
 
                     if existing_child_version:
-                        # 将现有的 JSON 字符串转换为字典
-                        child_versions = json.loads(existing_child_version)
+                        # 如果已经是字符串形式的 JSON，先进行解析
+                        if isinstance(existing_child_version, str):
+                            child_versions = json.loads(existing_child_version)
+                        else:
+                            child_versions = existing_child_version
                     else:
                         child_versions = {}
 
@@ -362,8 +370,10 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                         "UPDATE conversations SET conversation_child_version = %s WHERE conversation_id = %s",
                         (conversation_child_version, str(request.conversation_parent_id))  # 转换 UUID 为字符串
                     )
+                    logger.info("Updated parent conversation's child version in the database")
 
         # 准备插入语句
+        logger.info("Inserting new conversation with ID: %s", conversation_id)
         insert_query = sql.SQL("""
             INSERT INTO conversations (
                 conversation_id,
@@ -387,6 +397,11 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
 
         # 插入数据
         with conn.cursor() as cur:
+            logger.info(
+                "Executing insert with values: conversation_id=%s, session_id=%s, created_at=%s, conversation_type=%s, content=%s, version=%s, conversation_parent_id=%s, conversation_child_version=%s",
+                conversation_id, request.session_id, created_at, request.conversation_type, request.content, request.version,
+                str(request.conversation_parent_id) if request.conversation_parent_id else None, conversation_child_version
+            )
             cur.execute(
                 insert_query,
                 (
@@ -410,6 +425,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
             # 提交事务
             conn.commit()
             result = cur.fetchone()  # 获取插入的返回结果
+            logger.info("Insert result: %s", result)
 
         if result:
             # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
@@ -431,6 +447,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 "conversation_para_version": conversation_child_version  # 新增字段，返回更新后的父级子版本信息
             }
         else:
+            logger.error("Failed to fetch insert result")
             raise HTTPException(status_code=500, detail="Failed to create conversation")
 
     except Exception as e:
