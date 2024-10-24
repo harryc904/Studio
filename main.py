@@ -452,78 +452,78 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         if conn:
             db_pool.putconn(conn)
 
-# # 查询会话的接口
-# @app.get("/sessions", response_model=List[dict])
-# def get_sessions_by_user_id(
-#     user_id: int,
-#     current_user: UserInDB = Depends(get_current_user)
-# ):
-#     # 验证 user_id 和当前用户是否一致
-#     if current_user.user_id != user_id:
-#         raise HTTPException(
-#             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="User ID does not match the authenticated user's ID",
-#         )
+# 查询会话的接口
+@app.get("/sessions", response_model=List[dict])
+def get_sessions_by_user_id(
+    user_id: int,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    # 验证 user_id 和当前用户是否一致
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID",
+        )
     
-#     conn = None
-#     try:
-#         # 获取数据库连接
-#         conn = get_db_connection()
-#         with conn.cursor() as cur:
-#             # 查询指定 user_id 的会话信息
-#             query = """
-#             SELECT session_id, session_name, start_time, end_time
-#             FROM sessions
-#             WHERE user_id = %s
-#             ORDER BY session_id ASC
-#             """
-#             cur.execute(query, (user_id,))
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 查询指定 user_id 的会话信息
+            query = """
+            SELECT session_id, session_name, start_time, end_time
+            FROM sessions
+            WHERE user_id = %s
+            ORDER BY session_id ASC
+            """
+            cur.execute(query, (user_id,))
 
-#             # 获取查询结果
-#             rows = cur.fetchall()
-#             if not rows:
-#                 return []
+            # 获取查询结果
+            rows = cur.fetchall()
+            if not rows:
+                return []
 
-#             # 构造返回结果，并查找每个 session_id 对应的 session_desc
-#             sessions = []
-#             for row in rows:
-#                 session_id = row[0]
-#                 session_name = row[1]
-#                 start_time = row[2]
-#                 end_time = row[3]
+            # 构造返回结果，并查找每个 session_id 对应的 session_desc
+            sessions = []
+            for row in rows:
+                session_id = row[0]
+                session_name = row[1]
+                start_time = row[2]
+                end_time = row[3]
 
-#                 # 查找 conversations 表中该 session_id 最早的 response_from_model
-#                 desc_query = """
-#                 SELECT response_from_model
-#                 FROM conversations
-#                 WHERE session_id = %s
-#                 ORDER BY created_at ASC
-#                 LIMIT 1
-#                 """
-#                 cur.execute(desc_query, (session_id,))
-#                 desc_result = cur.fetchone()
+                # 查找 conversations 表中该 session_id 最早的 conversation_type 为 1 的 content
+                desc_query = """
+                SELECT content
+                FROM conversations
+                WHERE session_id = %s AND conversation_type = 1
+                ORDER BY created_at ASC
+                LIMIT 1
+                """
+                cur.execute(desc_query, (session_id,))
+                desc_result = cur.fetchone()
 
-#                 # 如果存在最早的 response_from_model，则作为 session_desc
-#                 session_desc = desc_result[0] if desc_result else None
+                # 如果存在最早的 response_from_model，则作为 session_desc
+                session_desc = desc_result[0] if desc_result else None
 
-#                 # 添加到结果列表
-#                 sessions.append({
-#                     "session_id": session_id,
-#                     "session_name": session_name,
-#                     "start_time": start_time,
-#                     "end_time": end_time,
-#                     "session_desc": session_desc
-#                 })
+                # 添加到结果列表
+                sessions.append({
+                    "session_id": session_id,
+                    "session_name": session_name,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "session_desc": session_desc
+                })
 
-#             return sessions
+            return sessions
 
-#     except Exception as e:
-#         logger.error(f"Error querying sessions for user_id {user_id}: {e}")
-#         raise HTTPException(status_code=500, detail="Internal server error")
+    except Exception as e:
+        logger.error(f"Error querying sessions for user_id {user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
-#     finally:
-#         if conn:
-#             db_pool.putconn(conn)
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 
 # # 查询对话的接口
