@@ -343,14 +343,14 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 if parent_record:
                     existing_child_version = parent_record[0]
                     if existing_child_version:
-                        # 解析为字典形式
+                        # 将现有的 JSON 字符串转换为字典
                         child_versions = json.loads(existing_child_version)
                     else:
                         child_versions = {}
 
                     # 更新子版本信息
                     child_versions[str(request.version)] = conversation_id
-                    conversation_child_version = json.dumps(child_versions)
+                    conversation_child_version = json.dumps(child_versions)  # 将字典转换回 JSON 字符串
 
                     # 更新父级 conversation 的 conversation_child_version
                     cur.execute(
