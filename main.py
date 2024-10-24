@@ -325,16 +325,11 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
     
     # 获取数据库连接
     conn = get_db_connection()
-    logger.info("Database connection established")
+    created_at = datetime.now()  # 获取当前时间
 
     try:
-        created_at = datetime.now()  # 获取当前时间
-        logger.info("Current timestamp: %s", created_at)
-
         # 处理可选字段的默认值
         conversation_id = str(request.conversation_id or uuid.uuid4())  # 转换 UUID 为字符串
-        logger.info("Generated conversation ID: %s", conversation_id)
-
         conversation_child_version = None
 
         # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
@@ -374,7 +369,6 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     logger.info("Updated parent conversation's child version in the database")
 
         # 准备插入语句
-        logger.info("Inserting new conversation with ID: %s", conversation_id)
         insert_query = sql.SQL("""
             INSERT INTO conversations (
                 conversation_id,
@@ -398,11 +392,6 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
 
         # 插入数据
         with conn.cursor() as cur:
-            logger.info(
-                "Executing insert with values: conversation_id=%s, session_id=%s, created_at=%s, conversation_type=%s, content=%s, version=%s, conversation_parent_id=%s, conversation_child_version=%s",
-                conversation_id, request.session_id, created_at, request.conversation_type, request.content, request.version,
-                str(request.conversation_parent_id) if request.conversation_parent_id else None, conversation_child_version
-            )
             cur.execute(
                 insert_query,
                 (
@@ -413,7 +402,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     request.content,             # 文本内容
                     request.version,             # 版本
                     str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
-                    conversation_child_version,  # 更新后的子版本信息
+                    None,                        # 更新后的子版本信息
                     request.dify_func_def,       # 可选字段 dify_func_def
                     request.dify_func_des,       # 可选字段 dify_func_des
                     request.dify_mod_des,        # 可选字段 dify_mod_des
@@ -426,7 +415,6 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
             # 提交事务
             conn.commit()
             result = cur.fetchone()  # 获取插入的返回结果
-            logger.info("Insert result: %s", result)
 
         if result:
             # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
