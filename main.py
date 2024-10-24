@@ -14,6 +14,7 @@ from psycopg2 import pool  # 导入连接池模块
 import uuid
 import asyncpg
 import logging
+import json
 
 # 初始化 logging 配置
 logging.basicConfig(
