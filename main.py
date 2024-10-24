@@ -340,8 +340,12 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     (str(request.conversation_parent_id),)  # 转换 UUID 为字符串
                 )
                 parent_record = cur.fetchone()
+                logger.info("Fetched parent_record: %s", parent_record)
+
                 if parent_record:
                     existing_child_version = parent_record[0]
+                    logger.info("Existing child version type: %s, value: %s", type(existing_child_version), existing_child_version)
+
                     if existing_child_version:
                         # 将现有的 JSON 字符串转换为字典
                         child_versions = json.loads(existing_child_version)
@@ -351,6 +355,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     # 更新子版本信息
                     child_versions[str(request.version)] = conversation_id
                     conversation_child_version = json.dumps(child_versions)  # 将字典转换回 JSON 字符串
+                    logger.info("Updated conversation_child_version: %s", conversation_child_version)
 
                     # 更新父级 conversation 的 conversation_child_version
                     cur.execute(
