@@ -76,7 +76,7 @@ class ConversationCreateRequest(BaseModel):
     session_id: int
     conversation_type: int  # 必填，0 代表 user_message，1 代表 response_from_model
     content: str
-    version: int
+    version: Optional[int] = None
     conversation_parent_id: Optional[uuid.UUID] = None  # 可选，父对话 ID，如果没有父对话可为空
     dify_id: Optional[str] = None  # 可选
     dify_func_def: Optional[str] = None
@@ -331,6 +331,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         # 处理可选字段的默认值
         conversation_id = str(request.conversation_id or uuid.uuid4())  # 转换 UUID 为字符串
         conversation_child_version = None
+        version = 1  # 默认版本号为 1，如果没有父对话
 
         # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
         if request.conversation_parent_id:
@@ -356,11 +357,12 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     else:
                         child_versions = {}
                     
-                    # 检查版本号是否已存在
-                    if str(request.version) in child_versions:
-                        logger.warning("Version %s already exists for parent conversation %s", request.version, request.conversation_parent_id)
-                        # 直接返回空响应
-                        return {}
+                    # 自动生成版本号：找到最高版本号并加一
+                    if child_versions:
+                        max_version = max(int(ver) for ver in child_versions.keys())
+                        version = max_version + 1
+                    else:
+                        version = 1
 
                     # 更新子版本信息
                     child_versions[str(request.version)] = conversation_id
@@ -406,7 +408,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     created_at,                  # 当前时间
                     request.conversation_type,   # 对话类型
                     request.content,             # 文本内容
-                    request.version,             # 版本
+                    version,                     # 版本
                     str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
                     None,                        # 更新后的子版本信息
                     request.dify_func_def,       # 可选字段 dify_func_def
