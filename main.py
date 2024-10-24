@@ -355,6 +355,12 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                             child_versions = existing_child_version
                     else:
                         child_versions = {}
+                    
+                    # 检查版本号是否已存在
+                    if str(request.version) in child_versions:
+                        logger.warning("Version %s already exists for parent conversation %s", request.version, request.conversation_parent_id)
+                        # 直接返回空响应
+                        return {}
 
                     # 更新子版本信息
                     child_versions[str(request.version)] = conversation_id
