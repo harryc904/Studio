@@ -322,11 +322,12 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         )
 
     conn = None
-    try:
-        # 获取数据库连接
-        conn = get_db_connection()
-        logger.info("Database connection established")
+    
+    # 获取数据库连接
+    conn = get_db_connection()
+    logger.info("Database connection established")
 
+    try:
         created_at = datetime.now()  # 获取当前时间
         logger.info("Current timestamp: %s", created_at)
 
