@@ -73,18 +73,17 @@ class SessionCreateRequest(BaseModel):
 class ConversationCreateRequest(BaseModel):
     user_id: int
     session_id: int
-    user_message: str
-    response_from_model: str
-    dify_id: str
+    conversation_type: int  # 必填，0 代表 user_message，1 代表 response_from_model
+    content: str
+    version: int
+    conversation_parent_id: Optional[uuid.UUID] = None  # 可选，父对话 ID，如果没有父对话可为空
+    dify_id: Optional[str] = None  # 可选
     dify_func_def: Optional[str] = None
     dify_func_des: Optional[str] = None
     dify_mod_des: Optional[str] = None
     dify_code: Optional[str] = None
     preview_code: Optional[str] = None
     conversation_id: Optional[uuid.UUID] = None
-    response_count: Optional[int] = None
-    is_modified: Optional[bool] = None
-    conversation_parent_id: Optional[uuid.UUID] = None
 
 # 用于返回会话数据的模型
 class ConversationResponse(BaseModel):
@@ -313,6 +312,7 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
 @app.post("/conversations")
 async def create_conversation(request: ConversationCreateRequest, current_user: UserInDB = Depends(get_current_user)):
     logger.info("User %s is creating a conversation for session_id: %s", current_user.user_id, request.session_id)
+    
     # 验证请求中的 user_id 是否与当前登录的用户一致
     if current_user.user_id != request.user_id:
         raise HTTPException(
@@ -328,9 +328,34 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
 
         # 处理可选字段的默认值
         conversation_id = request.conversation_id or str(uuid.uuid4())  # 生成UUID（如果为空）
-        response_count = request.response_count if request.response_count is not None else 1  # 默认值 1
-        is_modified = request.is_modified if request.is_modified is not None else False  # 默认值 False
-        conversation_parent_id = request.conversation_parent_id if request.conversation_parent_id is not None else None  # 默认值 None
+        conversation_child_version = None
+
+        # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
+        if request.conversation_parent_id:
+            with conn.cursor() as cur:
+                # 查询父级对话的当前 conversation_child_version
+                cur.execute(
+                    "SELECT conversation_child_version FROM conversations WHERE conversation_id = %s",
+                    (str(request.conversation_parent_id),)
+                )
+                parent_record = cur.fetchone()
+                if parent_record:
+                    existing_child_version = parent_record[0]
+                    if existing_child_version:
+                        # 解析为字典形式
+                        child_versions = json.loads(existing_child_version)
+                    else:
+                        child_versions = {}
+
+                    # 更新子版本信息
+                    child_versions[str(request.version)] = str(conversation_id)
+                    conversation_child_version = json.dumps(child_versions)
+
+                    # 更新父级 conversation 的 conversation_child_version
+                    cur.execute(
+                        "UPDATE conversations SET conversation_child_version = %s WHERE conversation_id = %s",
+                        (conversation_child_version, str(request.conversation_parent_id))
+                    )
 
         # 准备插入语句
         insert_query = sql.SQL("""
@@ -338,11 +363,11 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 conversation_id,
                 session_id,
                 created_at,
-                user_message,
-                response_from_model,
-                response_count,
-                is_modified,
+                conversation_type,
+                content,
+                version,
                 conversation_parent_id,
+                conversation_child_version,
                 dify_func_def,
                 dify_func_des,
                 dify_mod_des,
@@ -351,56 +376,57 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 preview_code
             )
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING conversation_id, session_id, created_at, user_message, response_from_model, response_count, is_modified, conversation_parent_id, dify_func_def, dify_func_des, dify_mod_des, dify_code, dify_id, preview_code;
+            RETURNING conversation_id, session_id, created_at, conversation_type, content, version, conversation_parent_id, conversation_child_version, dify_func_def, dify_func_des, dify_mod_des, dify_code, dify_id, preview_code;
         """)
 
-        # 插入数据，如果没有发送的字段使用 None（数据库会用默认值）
-        cur = conn.cursor()
-        cur.execute(
-            insert_query,
-            (
-                conversation_id,             # 处理后的 UUID
-                request.session_id,          # 会话ID
-                created_at,                  # 当前时间
-                request.user_message,        # 用户消息
-                request.response_from_model, # 模型的回复
-                response_count,              # 处理后的 response_count
-                is_modified,                 # 处理后的 is_modified
-                conversation_parent_id,       # 处理后的 conversation_parent_id
-                request.dify_func_def,        # 可选字段 dify_func_def
-                request.dify_func_des,        # 可选字段 dify_func_des
-                request.dify_mod_des,         # 可选字段 dify_mod_des
-                request.dify_code,            # 可选字段 dify_code
-                request.dify_id,              # 必填字段 dify_id
-                request.preview_code          # 可选字段 preview_code
+        # 插入数据
+        with conn.cursor() as cur:
+            cur.execute(
+                insert_query,
+                (
+                    conversation_id,             # 处理后的 UUID
+                    request.session_id,          # 会话ID
+                    created_at,                  # 当前时间
+                    request.conversation_type,   # 对话类型
+                    request.content,             # 文本内容
+                    request.version,             # 版本
+                    request.conversation_parent_id,  # 父对话 ID（如果存在）
+                    conversation_child_version,  # 更新后的子版本信息
+                    request.dify_func_def,       # 可选字段 dify_func_def
+                    request.dify_func_des,       # 可选字段 dify_func_des
+                    request.dify_mod_des,        # 可选字段 dify_mod_des
+                    request.dify_code,           # 可选字段 dify_code
+                    request.dify_id,             # 可选字段 dify_id
+                    request.preview_code         # 可选字段 preview_code
+                )
             )
-        )
 
-        # 提交事务
-        conn.commit()
-        result = cur.fetchone()  # 获取插入的返回结果
-        cur.close()
+            # 提交事务
+            conn.commit()
+            result = cur.fetchone()  # 获取插入的返回结果
 
         if result:
-            # 将结果返回给前端
+            # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
             return {
                 "conversation_id": result[0],
                 "session_id": result[1],
                 "created_at": result[2],
-                "user_message": result[3],
-                "response_from_model": result[4],
-                "response_count": result[5],
-                "is_modified": result[6],
-                "conversation_parent_id": result[7],
+                "conversation_type": result[3],
+                "content": result[4],
+                "version": result[5],
+                "conversation_parent_id": result[6],
+                "conversation_child_version": result[7],
                 "dify_func_def": result[8],
                 "dify_func_des": result[9],
                 "dify_mod_des": result[10],
                 "dify_code": result[11],
                 "dify_id": result[12],
-                "preview_code": result[13]
+                "preview_code": result[13],
+                "conversation_para_version": conversation_child_version  # 新增字段，返回更新后的父级子版本信息
             }
         else:
             raise HTTPException(status_code=500, detail="Failed to create conversation")
+
     except Exception as e:
         logger.error(f"Error creating conversation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -408,172 +434,172 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         if conn:
             db_pool.putconn(conn)
 
-# 查询会话的接口
-@app.get("/sessions", response_model=List[dict])
-def get_sessions_by_user_id(
-    user_id: int,
-    current_user: UserInDB = Depends(get_current_user)
-):
-    # 验证 user_id 和当前用户是否一致
-    if current_user.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User ID does not match the authenticated user's ID",
-        )
+# # 查询会话的接口
+# @app.get("/sessions", response_model=List[dict])
+# def get_sessions_by_user_id(
+#     user_id: int,
+#     current_user: UserInDB = Depends(get_current_user)
+# ):
+#     # 验证 user_id 和当前用户是否一致
+#     if current_user.user_id != user_id:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="User ID does not match the authenticated user's ID",
+#         )
     
-    conn = None
-    try:
-        # 获取数据库连接
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            # 查询指定 user_id 的会话信息
-            query = """
-            SELECT session_id, session_name, start_time, end_time
-            FROM sessions
-            WHERE user_id = %s
-            ORDER BY session_id ASC
-            """
-            cur.execute(query, (user_id,))
+#     conn = None
+#     try:
+#         # 获取数据库连接
+#         conn = get_db_connection()
+#         with conn.cursor() as cur:
+#             # 查询指定 user_id 的会话信息
+#             query = """
+#             SELECT session_id, session_name, start_time, end_time
+#             FROM sessions
+#             WHERE user_id = %s
+#             ORDER BY session_id ASC
+#             """
+#             cur.execute(query, (user_id,))
 
-            # 获取查询结果
-            rows = cur.fetchall()
-            if not rows:
-                return []
+#             # 获取查询结果
+#             rows = cur.fetchall()
+#             if not rows:
+#                 return []
 
-            # 构造返回结果，并查找每个 session_id 对应的 session_desc
-            sessions = []
-            for row in rows:
-                session_id = row[0]
-                session_name = row[1]
-                start_time = row[2]
-                end_time = row[3]
+#             # 构造返回结果，并查找每个 session_id 对应的 session_desc
+#             sessions = []
+#             for row in rows:
+#                 session_id = row[0]
+#                 session_name = row[1]
+#                 start_time = row[2]
+#                 end_time = row[3]
 
-                # 查找 conversations 表中该 session_id 最早的 response_from_model
-                desc_query = """
-                SELECT response_from_model
-                FROM conversations
-                WHERE session_id = %s
-                ORDER BY created_at ASC
-                LIMIT 1
-                """
-                cur.execute(desc_query, (session_id,))
-                desc_result = cur.fetchone()
+#                 # 查找 conversations 表中该 session_id 最早的 response_from_model
+#                 desc_query = """
+#                 SELECT response_from_model
+#                 FROM conversations
+#                 WHERE session_id = %s
+#                 ORDER BY created_at ASC
+#                 LIMIT 1
+#                 """
+#                 cur.execute(desc_query, (session_id,))
+#                 desc_result = cur.fetchone()
 
-                # 如果存在最早的 response_from_model，则作为 session_desc
-                session_desc = desc_result[0] if desc_result else None
+#                 # 如果存在最早的 response_from_model，则作为 session_desc
+#                 session_desc = desc_result[0] if desc_result else None
 
-                # 添加到结果列表
-                sessions.append({
-                    "session_id": session_id,
-                    "session_name": session_name,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "session_desc": session_desc
-                })
+#                 # 添加到结果列表
+#                 sessions.append({
+#                     "session_id": session_id,
+#                     "session_name": session_name,
+#                     "start_time": start_time,
+#                     "end_time": end_time,
+#                     "session_desc": session_desc
+#                 })
 
-            return sessions
+#             return sessions
 
-    except Exception as e:
-        logger.error(f"Error querying sessions for user_id {user_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+#     except Exception as e:
+#         logger.error(f"Error querying sessions for user_id {user_id}: {e}")
+#         raise HTTPException(status_code=500, detail="Internal server error")
 
-    finally:
-        if conn:
-            db_pool.putconn(conn)
+#     finally:
+#         if conn:
+#             db_pool.putconn(conn)
 
 
-# 查询对话的接口
-@app.get("/conversations/{session_id}", response_model=List[ConversationResponse])
-async def get_conversations(
-    session_id: int,
-    user_id: int,
-    current_user: int = Depends(get_current_user),
-    db=Depends(get_db_connection)
-):
-    logger.info("User %s is querying conversations for session_id: %s", user_id, session_id)
-    # 验证请求中的 user_id 是否与当前登录的用户一致
-    if current_user.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User ID does not match the authenticated user's ID",
-        )
+# # 查询对话的接口
+# @app.get("/conversations/{session_id}", response_model=List[ConversationResponse])
+# async def get_conversations(
+#     session_id: int,
+#     user_id: int,
+#     current_user: int = Depends(get_current_user),
+#     db=Depends(get_db_connection)
+# ):
+#     logger.info("User %s is querying conversations for session_id: %s", user_id, session_id)
+#     # 验证请求中的 user_id 是否与当前登录的用户一致
+#     if current_user.user_id != user_id:
+#         raise HTTPException(
+#             status_code=status.HTTP_403_FORBIDDEN,
+#             detail="User ID does not match the authenticated user's ID",
+#         )
 
-    # 查询 session_id 对应的 user_id
-    session_check_query = """
-    SELECT user_id FROM sessions WHERE session_id = %s
-    """
-    conn = None
-    try:
-        conn = db  # 获取数据库连接
-        cur = conn.cursor()  # 创建游标对象
+#     # 查询 session_id 对应的 user_id
+#     session_check_query = """
+#     SELECT user_id FROM sessions WHERE session_id = %s
+#     """
+#     conn = None
+#     try:
+#         conn = db  # 获取数据库连接
+#         cur = conn.cursor()  # 创建游标对象
 
-        # 执行查询，检查 session_id 是否存在，以及它对应的 user_id
-        cur.execute(session_check_query, (session_id,))
-        result = cur.fetchone()
+#         # 执行查询，检查 session_id 是否存在，以及它对应的 user_id
+#         cur.execute(session_check_query, (session_id,))
+#         result = cur.fetchone()
 
-        # 如果查询不到 session_id，返回空
-        if not result:
-            return []
-        session_user_id = result[0]  # 获取查询到的 user_id
+#         # 如果查询不到 session_id，返回空
+#         if not result:
+#             return []
+#         session_user_id = result[0]  # 获取查询到的 user_id
 
-        # 比对 session_id 对应的 user_id 和 请求的 user_id 是否一致
-        if session_user_id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to access this session."
-            )
+#         # 比对 session_id 对应的 user_id 和 请求的 user_id 是否一致
+#         if session_user_id != user_id:
+#             raise HTTPException(
+#                 status_code=status.HTTP_403_FORBIDDEN,
+#                 detail="You do not have permission to access this session."
+#             )
 
-        # 如果 session_id 和 user_id 匹配，查询会话内容
-        query = """
-        SELECT 
-            conversation_id::text, session_id, created_at, 
-            user_message, response_from_model,
-            dify_func_def, dify_func_des, dify_mod_des, 
-            dify_code, dify_id, preview_code
-        FROM conversations
-        WHERE session_id = %s
-        ORDER BY created_at ASC
-        """
+#         # 如果 session_id 和 user_id 匹配，查询会话内容
+#         query = """
+#         SELECT 
+#             conversation_id::text, session_id, created_at, 
+#             user_message, response_from_model,
+#             dify_func_def, dify_func_des, dify_mod_des, 
+#             dify_code, dify_id, preview_code
+#         FROM conversations
+#         WHERE session_id = %s
+#         ORDER BY created_at ASC
+#         """
 
-        cur.execute(query, (session_id,))  # 执行查询
-        rows = cur.fetchall()  # 获取所有查询结果
+#         cur.execute(query, (session_id,))  # 执行查询
+#         rows = cur.fetchall()  # 获取所有查询结果
 
-        if not rows:
-            return []
+#         if not rows:
+#             return []
 
-        # 转换查询结果为 Pydantic 模型列表
-        conversations = [
-            ConversationResponse(
-                conversation_id=row[0],
-                session_id=row[1],
-                created_at=row[2],
-                user_message=row[3],
-                response_from_model=row[4],
-                dify_func_def=row[5],
-                dify_func_des=row[6], 
-                dify_mod_des=row[7],  
-                dify_code=row[8],   
-                dify_id=row[9],      
-                preview_code=row[10]
-            )
-            for row in rows
-        ]
+#         # 转换查询结果为 Pydantic 模型列表
+#         conversations = [
+#             ConversationResponse(
+#                 conversation_id=row[0],
+#                 session_id=row[1],
+#                 created_at=row[2],
+#                 user_message=row[3],
+#                 response_from_model=row[4],
+#                 dify_func_def=row[5],
+#                 dify_func_des=row[6], 
+#                 dify_mod_des=row[7],  
+#                 dify_code=row[8],   
+#                 dify_id=row[9],      
+#                 preview_code=row[10]
+#             )
+#             for row in rows
+#         ]
 
-        return conversations
+#         return conversations
     
-    except HTTPException as http_exc:
-        # 捕获并抛出自定义的 HTTP 错误
-        raise http_exc
+#     except HTTPException as http_exc:
+#         # 捕获并抛出自定义的 HTTP 错误
+#         raise http_exc
 
-    except Exception as e:
-        logger.error(f"Error querying conversations: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
+#     except Exception as e:
+#         logger.error(f"Error querying conversations: {e}")
+#         raise HTTPException(status_code=500, detail="Internal server error")
 
-    finally:
-        if cur:
-            cur.close()  # 关闭游标
-        if conn:
-            db_pool.putconn(conn)  # 将连接放回连接池
+#     finally:
+#         if cur:
+#             cur.close()  # 关闭游标
+#         if conn:
+#             db_pool.putconn(conn)  # 将连接放回连接池
 
 @app.delete("/sessions/{session_id}")
 async def delete_session(
