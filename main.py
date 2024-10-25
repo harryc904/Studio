@@ -611,17 +611,26 @@ async def get_conversations(
                 conversation_data = cur.fetchone()
 
                 if conversation_data:
-                    # 处理 conversation_child_version，确保是字典类型
-                    if isinstance(conversation_data[7], str):
-                        try:
-                            conversation_para_version = json.loads(conversation_data[7])
-                        except json.JSONDecodeError as e:
-                            logger.warning("Failed to decode JSON for conversation_id %s: %s", current_id, e)
-                            conversation_para_version = None
-                    elif isinstance(conversation_data[7], dict):
-                        conversation_para_version = conversation_data[7]
-                    else:
-                        conversation_para_version = None
+                    # 如果存在父级对话，获取父级的conversation_child_version
+                    conversation_para_version = None
+                    if conversation_data[6]:  # conversation_parent_id
+                        parent_id = conversation_data[6]
+                        cur.execute("""
+                            SELECT conversation_child_version
+                            FROM conversations
+                            WHERE conversation_id = %s
+                        """, (parent_id,))
+                        parent_data = cur.fetchone()
+                        if parent_data and parent_data[0]:
+                            # 确保父级的conversation_child_version是字典类型
+                            if isinstance(parent_data[0], str):
+                                try:
+                                    conversation_para_version = json.loads(parent_data[0])
+                                except json.JSONDecodeError:
+                                    logger.warning("Failed to decode JSON for parent_id %s", parent_id)
+                                    conversation_para_version = None
+                            elif isinstance(parent_data[0], dict):
+                                conversation_para_version = parent_data[0]
 
                     # 使用字典解包来创建 Pydantic 模型
                     conversation = ConversationResponse(
