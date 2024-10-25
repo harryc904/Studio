@@ -605,6 +605,7 @@ async def get_conversations(
                 else:
                     return []
                 
+            logger.info("Initial conversation id is %s", conversation_id)
             # 递归查找链路上的所有对话
             conversations = []
             visited_ids = set()
