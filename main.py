@@ -554,16 +554,19 @@ async def get_conversations(
         conn = get_db_connection()
         with conn.cursor() as cur:
             # 查询 session_id 对应的 user_id
+            logger.info("Checking session_id %s for user_id %s", session_id, user_id)
             cur.execute("SELECT user_id FROM sessions WHERE session_id = %s", (session_id,))
             result = cur.fetchone()
 
             # 如果查询不到 session_id，返回空
             if not result:
+                logger.warning("Session ID %s not found", session_id)
                 return []
             session_user_id = result[0]  # 获取查询到的 user_id
 
             # 比对 session_id 对应的 user_id 和 请求的 user_id 是否一致
             if session_user_id != user_id:
+                logger.warning("Session user_id %s does not match request user_id %s", session_user_id, user_id)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You do not have permission to access this session."
@@ -581,6 +584,7 @@ async def get_conversations(
                 latest_conversation = cur.fetchone()
                 if latest_conversation:
                     conversation_id = latest_conversation[0]
+                    logger.info("Latest conversation_id for session_id %s is %s", session_id, conversation_id)
                 else:
                     return []
                 
@@ -594,6 +598,8 @@ async def get_conversations(
                 if current_id in visited_ids:
                     continue
                 visited_ids.add(current_id)
+                logger.info("Processing conversation_id %s", current_id)
+
                 # 查询当前对话信息
                 cur.execute("""
                     SELECT conversation_id, session_id, created_at, conversation_type, content, version,
@@ -605,28 +611,43 @@ async def get_conversations(
                 conversation_data = cur.fetchone()
 
                 if conversation_data:
-                    # 添加到结果列表
-                    conversation = {
-                        "conversation_id": conversation_data[0],
-                        "session_id": conversation_data[1],
-                        "created_at": conversation_data[2],
-                        "conversation_type": conversation_data[3],
-                        "content": conversation_data[4],
-                        "version": conversation_data[5],
-                        "conversation_parent_id": conversation_data[6],
-                        "conversation_para_version": json.loads(conversation_data[7]) if conversation_data[7] else None,
-                        "dify_func_def": conversation_data[8],
-                        "dify_func_des": conversation_data[9],
-                        "dify_mod_des": conversation_data[10],
-                        "dify_code": conversation_data[11],
-                        "dify_id": conversation_data[12],
-                        "preview_code": conversation_data[13],
-                    }
-                    conversations.append(ConversationResponse(**conversation))
+                    # 处理 conversation_child_version，确保是字典类型
+                    if isinstance(conversation_data[7], str):
+                        try:
+                            conversation_para_version = json.loads(conversation_data[7])
+                        except json.JSONDecodeError as e:
+                            logger.warning("Failed to decode JSON for conversation_id %s: %s", current_id, e)
+                            conversation_para_version = None
+                    elif isinstance(conversation_data[7], dict):
+                        conversation_para_version = conversation_data[7]
+                    else:
+                        conversation_para_version = None
+
+                    # 使用字典解包来创建 Pydantic 模型
+                    conversation = ConversationResponse(
+                        conversation_id=conversation_data[0],
+                        session_id=conversation_data[1],
+                        created_at=conversation_data[2],
+                        conversation_type=conversation_data[3],
+                        content=conversation_data[4],
+                        version=conversation_data[5],
+                        conversation_parent_id=conversation_data[6],
+                        conversation_para_version=conversation_para_version,
+                        dify_func_def=conversation_data[8],
+                        dify_func_des=conversation_data[9],
+                        dify_mod_des=conversation_data[10],
+                        dify_code=conversation_data[11],
+                        dify_id=conversation_data[12],
+                        preview_code=conversation_data[13],
+                    )
+                    conversations.append(conversation)
 
                     # 如果存在父级对话，继续向上查找
                     if conversation_data[6]:
                         stack.append(str(conversation_data[6]))
+            # 根据 created_at 对 conversations 进行排序
+            conversations.sort(key=lambda x: x.created_at)
+
         # 返回查询结果
         return conversations
 
