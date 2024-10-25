@@ -572,8 +572,25 @@ async def get_conversations(
                     detail="You do not have permission to access this session."
                 )
     
-            # 如果没有传递 conversation_id，查询 session_id 下最新的 conversation_id
-            if not conversation_id:
+            # 如果传递了 conversation_id，通过 conversation_child_version 找到链路的起始点
+            if conversation_id:
+                while True:
+                    cur.execute("""
+                        SELECT conversation_id
+                        FROM conversations
+                        WHERE conversation_parent_id = %s
+                        ORDER BY version DESC
+                        LIMIT 1
+                    """, (conversation_id,))
+                    next_conversation = cur.fetchone()
+                    if next_conversation:
+                        # 如果找到下一个版本，继续查找
+                        conversation_id = next_conversation[0]
+                    else:
+                        # 没有下一个版本，则停止
+                        break
+            else:
+                # 如果没有传递 conversation_id，查询 session_id 下最新的 conversation_id
                 cur.execute("""
                     SELECT conversation_id
                     FROM conversations
