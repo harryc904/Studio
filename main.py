@@ -548,13 +548,6 @@ async def get_conversations(
         )
 
     conn = None
-    
-    # 查询 session_id 对应的 user_id
-    
-    session_check_query = """
-    SELECT user_id FROM sessions WHERE session_id = %s
-    """
-    conn = None
 
     try:
         # 获取数据库连接
@@ -642,8 +635,6 @@ async def get_conversations(
         raise HTTPException(status_code=500, detail="Internal server error")
 
     finally:
-        if cur:
-            cur.close()  # 关闭游标
         if conn:
             db_pool.putconn(conn)  # 将连接放回连接池
 
