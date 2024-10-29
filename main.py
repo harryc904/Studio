@@ -219,24 +219,24 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Response status code: {response.status_code}")
     return response
 
-
 @app.post("/register", response_model=UserRegisterResponse)
 async def register_user(user: UserRegisterRequest):
     conn = None
-    try:
-        # 检查用户名和邮箱是否已存在
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT user_id FROM users WHERE email = %s OR user_name = %s",
-                (user.email, user.username)
+
+    # 检查用户名和邮箱是否已存在
+    conn = get_db_connection()
+    with conn.cursor() as cur:
+        cur.execute(
+            "SELECT user_id FROM users WHERE email = %s OR user_name = %s",
+            (user.email, user.username)
+        )
+        if cur.fetchone():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email or username already registered"
             )
-            if cur.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Email or username already registered"
-                )
-        
+
+    try:
         # 哈希用户密码
         hashed_password = get_password_hash(user.password)
 
