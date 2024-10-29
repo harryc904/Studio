@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel, OAuthFlowPassword
 from fastapi.openapi.utils import get_openapi
 from fastapi.openapi.models import SecuritySchemeType, OAuth2
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Union, Optional, List
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -62,6 +62,18 @@ class User(BaseModel):
     user_id: int
     username: str
     email: str
+
+class UserRegisterRequest(BaseModel):
+    username: str
+    email: EmailStr
+    password: str
+
+class UserRegisterResponse(BaseModel):
+    user_id: int
+    username: str
+    email: str
+    access_token: str
+    token_type: str = "bearer"
 
 class UserInDB(User):
     hashed_password: str
@@ -206,6 +218,58 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
     logger.info(f"Response status code: {response.status_code}")
     return response
+
+@app.post("/register", response_model=UserRegisterResponse)
+async def register_user(user: UserRegisterRequest):
+    conn = None
+    try:
+        # 检查用户名和邮箱是否已存在
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT user_id FROM users WHERE email = %s OR user_name = %s",
+                (user.email, user.username)
+            )
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email or username already registered"
+                )
+        
+        # 哈希用户密码
+        hashed_password = get_password_hash(user.password)
+
+        # 创建新用户并插入数据库
+        with conn.cursor() as cur:
+            insert_query = """
+            INSERT INTO users (user_name, email, password)
+            VALUES (%s, %s, %s)
+            RETURNING user_id, user_name, email
+            """
+            cur.execute(insert_query, (user.username, user.email, hashed_password))
+            new_user = cur.fetchone()
+            conn.commit()
+
+        # 生成 JWT 访问令牌
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": new_user[2]}, expires_delta=access_token_expires
+        )
+
+        return UserRegisterResponse(
+            user_id=new_user[0],
+            username=new_user[1],
+            email=new_user[2],
+            access_token=access_token
+        )
+    
+    except Exception as e:
+        logger.error(f"Error during user registration: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+    
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 # 登录接口
 @app.post("/login", response_model=Token)
