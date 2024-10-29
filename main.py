@@ -219,6 +219,7 @@ async def log_requests(request: Request, call_next):
     logger.info(f"Response status code: {response.status_code}")
     return response
 
+
 @app.post("/register", response_model=UserRegisterResponse)
 async def register_user(user: UserRegisterRequest):
     conn = None
