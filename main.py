@@ -155,8 +155,7 @@ def get_user_from_db(email: str):
             )
             result = cur.fetchone()
             if result:
-                hashed_password = get_password_hash(result[3])
-                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=hashed_password)
+                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3])
             return None
     except Exception as e:
         logger.error(f"Error fetching user from database: {e}")
@@ -283,6 +282,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
+        
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
