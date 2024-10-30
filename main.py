@@ -274,15 +274,15 @@ async def register_user(user: UserRegisterRequest):
 # 登录接口
 @app.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(form_data.email, form_data.password)
     if not user:
-        logger.warning("Login failed for user: %s", form_data.username)
+        logger.warning("Login failed for user: %s", form_data.useremail)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={"sub": user.email}, expires_delta=access_token_expires
