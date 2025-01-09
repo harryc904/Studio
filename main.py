@@ -187,6 +187,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 # 定义一个函数，用于解码 JWT 并获取当前用户信息
 def get_current_user(token: str = Depends(oauth2_scheme)):
     # 定义 JWT 验证失败时的异常
+    
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
