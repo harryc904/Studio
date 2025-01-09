@@ -1,0 +1,14 @@
+# Python 忽略项
+__pycache__/
+*.py[cod]
+*.so
+.Python
+venv/
+env/
+.env
+*.env
+
+# 编辑器相关忽略项
+.idea/
+.vscode/
+.DS_Store
