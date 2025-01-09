@@ -330,7 +330,6 @@ async def logout():
 @app.post("/sessions")
 def create_session(request: SessionCreateRequest, current_user: UserInDB = Depends(get_current_user)):
     logger.info("Creating a session for user_id: %s", request.user_id)
-
     # 验证请求中的 user_id 是否与当前登录的用户一致
     if current_user.user_id != request.user_id:
         raise HTTPException(
