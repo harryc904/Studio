@@ -54,7 +54,7 @@ TEMPLATE_ID = "2349714"  # 模板 ID
 REGION = "ap-guangzhou"  # 默认区域
 SMS_APPID = "1400960709" # 短信 SDK App ID
 
-# 配置 Redis
+# 配置 Redis?
 redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
 
 # JWT 配置
