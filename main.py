@@ -50,12 +50,13 @@ db_pool = pool.SimpleConnectionPool(
 SECRET_ID = "AKID75qOmwrY0DBvzvfBZjfNr8Bzuc5KKFyZ"
 SECRET_KEY1 = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
 SMS_SIGN = "上海仰望平凡科技"  # 短信签名
-TEMPLATE_ID = "2349714"  # 模板 ID
+REGISTER_TEMPLATE_ID = "2349714"  # 注册模板 ID
+LOGIN_TEMPLATE_ID = "2349726"  # 登录模板 ID 
 REGION = "ap-guangzhou"  # 默认区域
 SMS_APPID = "1400960709" # 短信 SDK App ID
 
 # 配置 Redis?
-redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+redis_client = redis.StrictRedis(host='43.129.162.15', port=6379, db=0, decode_responses=True, socket_timeout=10)
 
 # JWT 配置
 SECRET_KEY = "aP6pUzRWg9ae9UojkDPFGXBcFvRqRv7UwTiTe3LMzKk"
@@ -231,12 +232,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
     return user  # 返回当前用户信息
 
-async def send_verification_code(phone_number: str):
+async def send_verification_code(phone_number: str, purpose: int):
     # 设置腾讯云 SMS 服务的证书
     cred = credential.Credential(SECRET_ID, SECRET_KEY1)
     client = sms_client.SmsClient(cred, REGION)
     # 生成验证码
     verification_code = str(random.randint(100000, 999999))
+
+    # 选择适当的模板 ID 和 Purpose
+    if purpose == 0:  # 注册
+        TEMPLATE_ID = REGISTER_TEMPLATE_ID
+    elif purpose == 1:  # 登录
+        TEMPLATE_ID = LOGIN_TEMPLATE_ID
+    else:
+        raise HTTPException(status_code=400, detail="Invalid purpose value")
 
     # 构建发送请求的消息
     req = models.SendSmsRequest()
@@ -254,8 +263,8 @@ async def send_verification_code(phone_number: str):
         response = client.SendSms(req)
         print(response.to_json_string())
 
-#        # 将验证码存储在 Redis 中，设置过期时间为 5 分钟
-#        store_verification_code(phone_number, verification_code)        
+        # 储存验证码到数据库，并记录用途
+        store_verification_code(phone_number, verification_code, purpose)
         return {"message": "Verification code sent successfully"}
     
     except TencentCloudSDKException as err:
@@ -266,14 +275,49 @@ async def send_verification_code(phone_number: str):
         print(f"Unexpected error: {e}")
         raise HTTPException(status_code=500, detail="Unexpected error occurred")
 
-# 函数：存储验证码到 Redis
-def store_verification_code(phone_number: str, verification_code: str):
-    try:
-        redis_client.setex(f"verify_code:{phone_number}", timedelta(minutes=5), verification_code)
-    except Exception as e:
-        logger.error(f"Error storing verification code in Redis: {e}")
-        raise HTTPException(status_code=500, detail="Error storing verification code in Redis")
+# 函数：存储验证码
+def store_verification_code(phone_number: str, verification_code: str, purpose: int):
+    # 获取当前时间和过期时间（5分钟后）
+    expiration_time = datetime.now() + timedelta(minutes=5)
 
+    conn = None
+    try:
+        # 连接到数据库
+        conn = get_db_connection()  # 替换为你的数据库连接方式
+        cursor = conn.cursor()
+
+        # 检查是否已存在相同手机号和用途的验证码记录
+        cursor.execute("""
+            SELECT COUNT(*) FROM verification_codes
+            WHERE phone_number = %s AND purpose = %s;
+        """, (phone_number, purpose))
+
+        existing_record = cursor.fetchone()[0]
+
+        if existing_record > 0:
+            # 如果记录存在，更新验证码和过期时间
+            cursor.execute("""
+                UPDATE verification_codes
+                SET verification_code = %s, expiration_time = %s, updated_at = NOW()
+                WHERE phone_number = %s AND purpose = %s;
+            """, (verification_code, expiration_time, phone_number, purpose))
+            conn.commit()
+            print(f"Updated verification code for {phone_number} with purpose {purpose}")
+        else:
+            # 如果记录不存在，插入新的验证码记录
+            cursor.execute("""
+                INSERT INTO verification_codes (phone_number, verification_code, expiration_time, purpose)
+                VALUES (%s, %s, %s, %s);
+            """, (phone_number, verification_code, expiration_time, purpose))
+            conn.commit()
+            print(f"Inserted new verification code for {phone_number} with purpose {purpose}")
+
+    except Exception as e:
+        print(f"Error storing verification code: {e}")
+        raise HTTPException(status_code=500, detail="Error storing verification code")
+    finally:
+        if conn:
+            conn.close()
 
 # 函数：从 Redis 获取验证码
 def get_verification_code(phone_number: str):
@@ -293,9 +337,9 @@ async def log_requests(request: Request, call_next):
 
 # 请求验证码接口
 @app.post("/request_verification_code")
-async def request_verification_code(phone_number: str):
+async def request_verification_code(phone_number: str, purpose: int):
     # 通过腾讯云接口发送验证码
-    return await send_verification_code(phone_number)
+    return await send_verification_code(phone_number, purpose)
 
 @app.post("/register", response_model=UserRegisterResponse)
 async def register_user(user: UserRegisterRequest):
