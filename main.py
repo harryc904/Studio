@@ -443,6 +443,10 @@ async def register_user(user: UserRegisterRequest):
             access_token=access_token
         )
     
+    except HTTPException as e:
+        # 捕获已定义的 HTTPException 并返回具体错误
+        raise e
+
     except Exception as e:
         logger.error(f"Error during user registration: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -550,6 +554,7 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
                 }
             else:
                 raise HTTPException(status_code=500, detail="Failed to create session")
+
     except Exception as e:
         logger.error(f"Error creating session: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
