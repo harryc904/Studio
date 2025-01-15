@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from fastapi import FastAPI, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.openapi.models import OAuthFlows as OAuthFlowsModel, OAuthFlowPassword
@@ -12,6 +11,7 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from tencentcloud.sms.v20210111 import sms_client, models
 from tencentcloud.common import credential
+from tencentcloud.common.exception.tencent_cloud_sdk_exception import TencentCloudSDKException
 import random
 import time
 import redis
@@ -48,7 +48,7 @@ db_pool = pool.SimpleConnectionPool(
 
 # 配置腾讯云 API 密钥（SecretId 和 SecretKey）
 SECRET_ID = "AKID75qOmwrY0DBvzvfBZjfNr8Bzuc5KKFyZ"
-SECRET_KEY = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
+SECRET_KEY1 = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
 SMS_SIGN = "上海仰望平凡科技"  # 短信签名
 TEMPLATE_ID = "2349714"  # 模板 ID
 REGION = "ap-guangzhou"  # 默认区域
@@ -233,37 +233,38 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 async def send_verification_code(phone_number: str):
     # 设置腾讯云 SMS 服务的证书
-    cred = credential.Credential(SECRET_ID, SECRET_KEY)
+    cred = credential.Credential(SECRET_ID, SECRET_KEY1)
     client = sms_client.SmsClient(cred, REGION)
-
     # 生成验证码
     verification_code = str(random.randint(100000, 999999))
 
     # 构建发送请求的消息
-    params = [verification_code, "5"]  # 参数为验证码和有效时长5分钟
     req = models.SendSmsRequest()
-    req.SmsSdkAppid = SMS_APPID
-    req.Sign = SMS_SIGN
-    req.TemplateID = TEMPLATE_ID
-    req.PhoneNumberSet = [phone_number]
-    req.TemplateParamSet = params
+    params = {
+        "PhoneNumberSet": [phone_number],
+        "SmsSdkAppId": SMS_APPID,
+        "TemplateId": TEMPLATE_ID,
+        "SignName": SMS_SIGN,
+        "TemplateParamSet": [ verification_code, "5" ]
+    }
+    req.from_json_string(json.dumps(params))
 
     try:
         # 发送短信验证码
         response = client.SendSms(req)
+        print(response.to_json_string())
 
-        # 检查返回结果是否发送成功
-        if response.Response.Error:
-            raise HTTPException(status_code=500, detail="Failed to send SMS: " + response.Response.Error.Message)
-
-        # 将验证码存储在 Redis 中，设置过期时间为 5 分钟
-        store_verification_code(phone_number, verification_code)
-        
+#        # 将验证码存储在 Redis 中，设置过期时间为 5 分钟
+#        store_verification_code(phone_number, verification_code)        
         return {"message": "Verification code sent successfully"}
     
+    except TencentCloudSDKException as err:
+        print(f"Error sending SMS: {err}")
+        raise HTTPException(status_code=500, detail=f"Error sending SMS: {err}")
+
     except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail="Error sending SMS")
+        print(f"Unexpected error: {e}")
+        raise HTTPException(status_code=500, detail="Unexpected error occurred")
 
 # 函数：存储验证码到 Redis
 def store_verification_code(phone_number: str, verification_code: str):
