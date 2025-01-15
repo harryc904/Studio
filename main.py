@@ -558,6 +558,7 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
     except Exception as e:
         logger.error(f"Error creating session: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+    
     finally:
         if conn:
             db_pool.putconn(conn)
