@@ -93,6 +93,7 @@ class UserRegisterResponse(BaseModel):
     user_id: int
     username: str
     email: str
+    phone_number: str
     access_token: str
     token_type: str = "bearer"
 
@@ -319,13 +320,34 @@ def store_verification_code(phone_number: str, verification_code: str, purpose: 
         if conn:
             conn.close()
 
-# 函数：从 Redis 获取验证码
-def get_verification_code(phone_number: str):
+# 从数据库中获取有效验证码
+def get_verification_code(phone_number: str, purpose: int):
+    conn = get_db_connection()
     try:
-        return redis_client.get(f"verify_code:{phone_number}")
+        with conn.cursor() as cur:
+            # 查询指定手机号和用途的验证码
+            cur.execute("""
+                SELECT verification_code, expiration_time
+                FROM verification_codes
+                WHERE phone_number = %s AND purpose = %s
+                ORDER BY expiration_time DESC
+                LIMIT 1
+            """, (phone_number, purpose))
+            
+            result = cur.fetchone()
+            if result:
+                stored_code, expiration_time = result
+                # 如果验证码过期，返回 None
+                if expiration_time < datetime.utcnow():
+                    return None
+                return stored_code
+            return None
     except Exception as e:
-        logger.error(f"Error retrieving verification code from Redis: {e}")
-        raise HTTPException(status_code=500, detail="Error retrieving verification code from Redis")
+        logger.error(f"Error fetching verification code: {e}")
+        return None
+    finally:
+        if conn:
+            db_pool.putconn(conn)
 
 # 添加中间件来记录请求和响应
 @app.middleware("http")
@@ -345,28 +367,54 @@ async def request_verification_code(phone_number: str, purpose: int):
 async def register_user(user: UserRegisterRequest):
     conn = None
 
-    # 检查用户名和邮箱是否已存在
+    # 连接到数据库
     conn = get_db_connection()
-    with conn.cursor() as cur:
-        cur.execute(
-            "SELECT user_id FROM users WHERE email = %s OR user_name = %s",
-            (user.email, user.username)
-        )
-        if cur.fetchone():
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email or username already registered"
-            )
-
-    # 验证手机号验证码
-    stored_code = get_verification_code(user.phone_number)
-    if not stored_code:
-        raise HTTPException(status_code=400, detail="Verification code expired or not sent")
-    
-    if stored_code != user.verification_code:
-        raise HTTPException(status_code=400, detail="Invalid verification code")
 
     try:
+        # 检查手机号是否已存在
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT user_id FROM users WHERE phone_number = %s",
+                (user.phone_number,)
+            )
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Phone number already registered"
+                )
+
+        # 检查邮箱是否已存在
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT user_id FROM users WHERE email = %s",
+                (user.email,)
+            )
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Email already registered"
+                )
+
+        # 检查用户名是否已存在
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT user_id FROM users WHERE user_name = %s",
+                (user.username,)
+            )
+            if cur.fetchone():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Username already registered"
+                )
+
+        # 验证手机号验证码
+        stored_code = get_verification_code(user.phone_number, purpose=0)  # 0: 注册用途
+        if not stored_code:
+            raise HTTPException(status_code=400, detail="Verification code expired or not sent")
+        
+        if stored_code != user.verification_code:
+            raise HTTPException(status_code=400, detail="Invalid verification code")
+        
         # 哈希用户密码
         hashed_password = get_password_hash(user.password)
 
@@ -391,6 +439,7 @@ async def register_user(user: UserRegisterRequest):
             user_id=new_user[0],
             username=new_user[1],
             email=new_user[2],
+            phone_number=new_user[3],
             access_token=access_token
         )
     
