@@ -299,7 +299,7 @@ def store_verification_code(phone_number: str, verification_code: str, purpose: 
             # 如果记录存在，更新验证码和过期时间
             cursor.execute("""
                 UPDATE verification_codes
-                SET verification_code = %s, expiration_time = %s, updated_at = NOW()
+                SET verification_code = %s, expiration_time = %s
                 WHERE phone_number = %s AND purpose = %s;
             """, (verification_code, expiration_time, phone_number, purpose))
             conn.commit()
