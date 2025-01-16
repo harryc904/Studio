@@ -287,6 +287,11 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
     return user  # 返回当前用户信息
 
 async def send_verification_code(phone_number: str, purpose: int):
+    if purpose == 1:  # 登录
+        user = get_user_by_phone(phone_number)
+        if not user:
+            raise HTTPException(status_code=400, detail="Phone number is not registered. Please register first.")
+
     # 设置腾讯云 SMS 服务的证书
     cred = credential.Credential(SECRET_ID, SECRET_KEY1)
     client = sms_client.SmsClient(cred, REGION)
