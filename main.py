@@ -81,7 +81,6 @@ class User(BaseModel):
     user_id: int
     username: str
     email: str
-    phone_number: str
 
 class UserRegisterRequest(BaseModel):
     username: str
@@ -104,6 +103,12 @@ class UserInDB(User):
 class SessionCreateRequest(BaseModel):
     user_id: int
     session_name: Optional[str] = None
+
+class LoginRequestForm(BaseModel):
+    username: Optional[str] = None  # 邮箱或用户名
+    password: Optional[str] = None  # 密码
+    phone_number: Optional[str] = None  # 手机号
+    verification_code: Optional[str] = None  # 验证码
 
 # 定义模型，用于验证和处理请求数据
 class ConversationCreateRequest(BaseModel):
@@ -167,18 +172,24 @@ def get_db_connection():
         raise HTTPException(status_code=500, detail="Database connection pool not initialized")
 
 # 从数据库中获取用户信息
-def get_user_from_db(email: str):
+def get_user_from_db(identifier: str, is_email: bool = True):
     conn = None
     try:
         conn = get_db_connection()
         with conn.cursor() as cur:
-            cur.execute(
-                sql.SQL("SELECT user_id, user_name, email, password, phone_number FROM users WHERE email = %s"),
-                (email,)
-            )
+            if is_email:
+                # 使用邮箱查询用户
+                cur.execute("SELECT user_id, user_name, email, password FROM users WHERE email = %s", (identifier,))
+            else:
+                # 使用手机号查询用户
+                cur.execute("SELECT user_id, user_name, email, password FROM users WHERE phone_number = %s", (identifier,))
+            
             result = cur.fetchone()
+            
             if result:
-                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3], phone_number=result[4])
+                # 创建并返回用户对象
+                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3])
+            
             return None
     except Exception as e:
         logger.error(f"Error fetching user from database: {e}")
@@ -187,13 +198,54 @@ def get_user_from_db(email: str):
         if conn:
             db_pool.putconn(conn)
 
+
+def get_user_by_phone(phone_number: str):
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        with conn.cursor() as cur:
+            # 执行 SQL 查询，查找手机号对应的用户
+            cur.execute(
+                sql.SQL("SELECT user_id, user_name, email, phone_number, password FROM users WHERE phone_number = %s"),
+                (phone_number,)
+            )
+            result = cur.fetchone()  # 获取查询结果
+
+            # 如果找到了该手机号的用户，返回 UserInDB 对象
+            if result:
+                return UserInDB(
+                    user_id=result[0],
+                    username=result[1],
+                    email=result[2],
+                    phone_number=result[3],
+                    hashed_password=result[4]
+                )
+            return None  # 没有找到用户则返回 None
+    except Exception as e:
+        # 记录错误日志
+        logger.error(f"Error fetching user by phone from database: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()  # 确保连接关闭
+
 # 验证用户并返回用户数据
-def authenticate_user(email: str, password: str):
-    user = get_user_from_db(email)
+def authenticate_user(username: str, password: str):
+    # 判断输入的是邮箱还是手机号
+    if "@" in username:
+        # 如果包含 @，认为是邮箱
+        user = get_user_from_db(username, is_email=True)
+    else:
+        # 否则，认为是手机号
+        user = get_user_from_db(username, is_email=False)
+
     if not user:
         return False
+    
     if not pwd_context.verify(password, user.hashed_password):
         return False
+    
     return user
 
 # 创建 JWT 令牌
@@ -228,7 +280,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
         raise credentials_exception
 
     # 从数据库中获取用户信息
-    user = get_user_from_db(email=token_data.email)
+    user = get_user_from_db(identifier=token_data.email, is_email=True)
     if user is None:
         raise credentials_exception
 
@@ -458,22 +510,60 @@ async def register_user(user: UserRegisterRequest):
 
 # 登录接口
 @app.post("/login", response_model=Token)
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = authenticate_user(form_data.username, form_data.password)
-    if not user:
-        logger.warning("Login failed for user: %s", form_data.username)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+async def login(form_data: LoginRequestForm):
+    # 情况 1：手机号或邮箱加密码登录
+    if form_data.username and form_data.password:
+        user = authenticate_user(form_data.username, form_data.password)
+        
+        if not user:
+            logger.warning("Login failed for user: %s", form_data.username)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Incorrect username or password",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.email}, expires_delta=access_token_expires
-    )
-    logger.info("User %s logged in successfully", user.email)
-    return {"access_token": access_token, "token_type": "bearer"}
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        logger.info("User %s logged in successfully", user.email)
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    # 情况 2：手机号加验证码登录
+    elif form_data.phone_number and form_data.verification_code:
+        # 从数据库获取用户信息，检查手机号是否存在
+        user = get_user_by_phone(form_data.phone_number)
+        print(user)
+        if not user:
+            logger.warning("Login failed for phone: %s", form_data.phone_number)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Phone number not registered",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # 获取数据库中存储的验证码
+        stored_code = get_verification_code(form_data.phone_number, purpose=1)  # 1: 登录用途
+        if not stored_code:
+            raise HTTPException(status_code=400, detail="Verification code expired or not sent")
+        
+        # 对比验证码
+        if stored_code != form_data.verification_code:
+            raise HTTPException(status_code=400, detail="Invalid verification code")
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": user.email}, expires_delta=access_token_expires
+        )
+        logger.info("User %s logged in successfully with phone number", user.email)
+        return {"access_token": access_token, "token_type": "bearer"}
+
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid login data provided"
+        )
 
 # 获取当前用户信息的接口
 @app.get("/users/me", response_model=User)
