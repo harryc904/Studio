@@ -81,6 +81,7 @@ class User(BaseModel):
     user_id: int
     username: str
     email: str
+    phone_number: str
 
 class UserRegisterRequest(BaseModel):
     username: str
@@ -172,12 +173,12 @@ def get_user_from_db(email: str):
         conn = get_db_connection()
         with conn.cursor() as cur:
             cur.execute(
-                sql.SQL("SELECT user_id, user_name, email, password FROM users WHERE email = %s"),
+                sql.SQL("SELECT user_id, user_name, email, password, phone_number FROM users WHERE email = %s"),
                 (email,)
             )
             result = cur.fetchone()
             if result:
-                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3])
+                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3], phone_number=result[4])
             return None
     except Exception as e:
         logger.error(f"Error fetching user from database: {e}")
