@@ -1165,3 +1165,41 @@ async def update_session_name(
             cur.close()  # 关闭游标
         if conn:
             db_pool.putconn(conn)  # 将连接放回连接池
+
+@app.put("/users/update_password")
+async def update_password(
+    new_password: str,
+    current_user: UserInDB = Depends(get_current_user)
+):
+
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # 将新密码进行哈希处理
+        hashed_password = get_password_hash(new_password)
+
+        # 更新数据库中的密码字段
+        update_query = """
+        UPDATE users
+        SET password = %s
+        WHERE user_id = %s
+        """
+        cur.execute(update_query, (hashed_password, current_user.user_id))
+
+        # 提交事务
+        conn.commit()
+
+        # 返回成功消息
+        logger.info(f"Password updated successfully for user {current_user.user_id}")
+        return {"message": "Password updated successfully"}
+
+    except Exception as e:
+        logger.error(f"Error updating password for user {current_user.user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)  # 将连接放回连接池
