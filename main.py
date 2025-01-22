@@ -89,6 +89,9 @@ class UserRegisterRequest(BaseModel):
     phone_number: str  # 新增手机号字段
     verification_code: str  # 新增验证码字段
 
+class UpdatePasswordRequest(BaseModel):
+    new_password: str
+
 class UserRegisterResponse(BaseModel):
     user_id: int
     username: str
@@ -1168,10 +1171,10 @@ async def update_session_name(
 
 @app.put("/users/update_password")
 async def update_password(
-    new_password: str,
+    request: UpdatePasswordRequest,
     current_user: UserInDB = Depends(get_current_user)
 ):
-
+    new_password = request.new_password
     conn = None
     try:
         # 获取数据库连接
