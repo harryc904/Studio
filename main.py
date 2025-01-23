@@ -51,7 +51,7 @@ SECRET_ID = "AKID75qOmwrY0DBvzvfBZjfNr8Bzuc5KKFyZ"
 SECRET_KEY1 = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
 SMS_SIGN = "上海仰望平凡科技"  # 短信签名
 REGISTER_TEMPLATE_ID = "2349714"  # 注册模板 ID
-LOGIN_TEMPLATE_ID = "2349726"  # 登录模板 ID 
+LOGIN_TEMPLATE_ID = "2349726"  # 登录模板 ID
 REGION = "ap-guangzhou"  # 默认区域
 SMS_APPID = "1400960709" # 短信 SDK App ID
 
@@ -128,6 +128,14 @@ class ConversationCreateRequest(BaseModel):
     dify_code: Optional[str] = None
     preview_code: Optional[str] = None
     conversation_id: Optional[uuid.UUID] = None
+
+class ConversationUpdateRequest(BaseModel):
+    user_id: int  # 用户 ID，用于验证当前登录用户
+    session_id: int  # 会话 ID，用于验证该会话是否存在
+    dify_func_def: Optional[str] = None  # 可选字段：dify_func_def
+    dify_func_des: Optional[str] = None  # 可选字段：dify_func_des
+    dify_mod_des: Optional[str] = None   # 可选字段：dify_mod_des
+    dify_code: Optional[str] = None      # 可选字段：dify_code
 
 # 用于返回会话数据的模型
 class ConversationResponse(BaseModel):
@@ -1206,3 +1214,94 @@ async def update_password(
     finally:
         if conn:
             db_pool.putconn(conn)  # 将连接放回连接池
+
+# 更新对话接口
+@app.put("/conversations/{conversation_id}")
+async def update_conversation(
+    conversation_id: uuid.UUID,  # 通过 URL 参数传递 conversation_id
+    request: ConversationUpdateRequest,  # 请求体使用新的结构体
+    current_user: UserInDB = Depends(get_current_user)  # 当前登录的用户
+):
+    logger.info("User %s is updating conversation %s for session_id: %s", current_user.user_id, conversation_id, request.session_id)
+
+    # 验证请求中的 user_id 是否与当前登录的用户一致
+    if current_user.user_id != request.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID",
+        )
+
+    conn = None
+
+    # 获取数据库连接
+    conn = get_db_connection()
+
+    try:
+        # 查询是否存在该 conversation_id 和 session_id 对应的对话
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT conversation_id, session_id FROM conversations WHERE conversation_id = %s AND session_id = %s",
+                (str(conversation_id), str(request.session_id))  # 转换 UUID 为字符串
+            )
+            conversation_record = cur.fetchone()
+
+            if not conversation_record:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Conversation not found for the given session_id"
+                )
+
+            # 构造更新字段的动态 SQL
+            update_fields = []
+            update_values = []
+
+            if request.dify_func_def is not None:
+                update_fields.append("dify_func_def = %s")
+                update_values.append(request.dify_func_def)
+
+            if request.dify_func_des is not None:
+                update_fields.append("dify_func_des = %s")
+                update_values.append(request.dify_func_des)
+
+            if request.dify_mod_des is not None:
+                update_fields.append("dify_mod_des = %s")
+                update_values.append(request.dify_mod_des)
+
+            if request.dify_code is not None:
+                update_fields.append("dify_code = %s")
+                update_values.append(request.dify_code)
+
+            # 如果没有需要更新的字段，返回错误
+            if not update_fields:
+                return {
+                    "message": "No fields were updated, but the request was successful."
+                }
+
+            # 将 conversation_id 添加到更新字段的参数中
+            update_values.append(str(conversation_id))
+
+            # 更新语句
+            update_query = sql.SQL("""
+                UPDATE conversations
+                SET {}
+                WHERE conversation_id = %s
+            """).format(sql.SQL(", ").join(map(sql.SQL, update_fields)))
+
+            with conn.cursor() as cur:
+                # 执行更新操作
+                cur.execute(update_query, tuple(update_values))
+                conn.commit()
+
+        return {"message": "Conversation updated successfully"}
+
+    except HTTPException as e:
+        # 捕获已定义的 HTTPException，直接抛出
+        raise e
+
+    except Exception as e:
+        logger.error(f"Error updating conversation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)
