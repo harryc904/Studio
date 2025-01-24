@@ -51,7 +51,7 @@ SECRET_ID = "AKID75qOmwrY0DBvzvfBZjfNr8Bzuc5KKFyZ"
 SECRET_KEY1 = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
 SMS_SIGN = "上海仰望平凡科技"  # 短信签名
 REGISTER_TEMPLATE_ID = "2349714"  # 注册模板 ID
-LOGIN_TEMPLATE_ID = "2349726"  # 登录模板 ID
+LOGIN_TEMPLATE_ID = "2354925"  # 登录模板 ID
 REGION = "ap-guangzhou"  # 默认区域
 SMS_APPID = "1400960709" # 短信 SDK App ID
 
@@ -81,6 +81,7 @@ class User(BaseModel):
     user_id: int
     username: str
     email: str
+    phone_number: Optional[str] = None  # 允许为空
 
 class UserRegisterRequest(BaseModel):
     username: str
@@ -190,16 +191,16 @@ def get_user_from_db(identifier: str, is_email: bool = True):
         with conn.cursor() as cur:
             if is_email:
                 # 使用邮箱查询用户
-                cur.execute("SELECT user_id, user_name, email, password FROM users WHERE email = %s", (identifier,))
+                cur.execute("SELECT user_id, user_name, email, password, phone_number FROM users WHERE email = %s", (identifier,))
             else:
                 # 使用手机号查询用户
-                cur.execute("SELECT user_id, user_name, email, password FROM users WHERE phone_number = %s", (identifier,))
+                cur.execute("SELECT user_id, user_name, email, password, phone_number FROM users WHERE phone_number = %s", (identifier,))
             
             result = cur.fetchone()
             
             if result:
                 # 创建并返回用户对象
-                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3])
+                return UserInDB(user_id=result[0], username=result[1], email=result[2], hashed_password=result[3], phone_number=result[4])
             
             return None
     except Exception as e:
