@@ -22,6 +22,11 @@ import uuid
 import asyncpg
 import logging
 import json
+# from uuid import UUID
+# import psycopg2.extras
+
+# # 注册 UUID 类型适配器
+# psycopg2.extras.register_uuid()
 
 # 初始化 logging 配置
 logging.basicConfig(
@@ -123,20 +128,22 @@ class ConversationCreateRequest(BaseModel):
     version: Optional[int] = None
     conversation_parent_id: Optional[uuid.UUID] = None  # 可选，父对话 ID，如果没有父对话可为空
     dify_id: Optional[str] = None  # 可选
-    dify_func_def: Optional[str] = None
+    knowledge_graph: Optional[str] = None
     dify_func_des: Optional[str] = None
-    dify_mod_des: Optional[str] = None
-    dify_code: Optional[str] = None
+    prd_content: Optional[str] = None
+    prd_version: Optional[int] = None
+    knowledge_id: Optional[str] = None
     preview_code: Optional[str] = None
     conversation_id: Optional[uuid.UUID] = None
 
 class ConversationUpdateRequest(BaseModel):
     user_id: int  # 用户 ID，用于验证当前登录用户
     session_id: int  # 会话 ID，用于验证该会话是否存在
-    dify_func_def: Optional[str] = None  # 可选字段：dify_func_def
+    knowledge_graph: Optional[str] = None  # 可选字段：knowledge_graph
     dify_func_des: Optional[str] = None  # 可选字段：dify_func_des
-    dify_mod_des: Optional[str] = None   # 可选字段：dify_mod_des
-    dify_code: Optional[str] = None      # 可选字段：dify_code
+    prd_content: Optional[str] = None   # 可选字段：prd_content
+    prd_version: Optional[int] = None
+    knowledge_id: Optional[str] = None      # 可选字段：knowledge_id
 
 # 用于返回会话数据的模型
 class ConversationResponse(BaseModel):
@@ -148,10 +155,11 @@ class ConversationResponse(BaseModel):
     version:int
     conversation_parent_id:Optional[uuid.UUID] = None
     conversation_para_version: Optional[dict] = None
-    dify_func_def: Optional[str] = None
+    knowledge_graph: Optional[str] = None
     dify_func_des: Optional[str] = None
-    dify_mod_des: Optional[str] = None
-    dify_code: Optional[str] = None
+    prd_content: Optional[str] = None
+    prd_version: Optional[int] = None
+    knowledge_id: Optional[str] = None
     dify_id: Optional[str] = None
     preview_code: Optional[str] = None
 
@@ -748,15 +756,14 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 version,
                 conversation_parent_id,
                 conversation_child_version,
-                dify_func_def,
+                knowledge_graph,
                 dify_func_des,
-                dify_mod_des,
-                dify_code,
+                knowledge_id,
                 dify_id,
                 preview_code
             )
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING conversation_id, session_id, created_at, conversation_type, content, version, conversation_parent_id, conversation_child_version, dify_func_def, dify_func_des, dify_mod_des, dify_code, dify_id, preview_code;
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING conversation_id, session_id, created_at, conversation_type, content, version, conversation_parent_id, conversation_child_version, knowledge_graph, dify_func_des, knowledge_id, dify_id, preview_code;
         """)
 
         # 插入数据
@@ -772,10 +779,9 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     version,                     # 版本
                     str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
                     None,                        # 更新后的子版本信息
-                    request.dify_func_def,       # 可选字段 dify_func_def
+                    request.knowledge_graph,       # 可选字段 knowledge_graph
                     request.dify_func_des,       # 可选字段 dify_func_des
-                    request.dify_mod_des,        # 可选字段 dify_mod_des
-                    request.dify_code,           # 可选字段 dify_code
+                    request.knowledge_id,           # 可选字段 knowledge_id
                     request.dify_id,             # 可选字段 dify_id
                     request.preview_code         # 可选字段 preview_code
                 )
@@ -784,6 +790,55 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
             # 提交事务
             conn.commit()
             result = cur.fetchone()  # 获取插入的返回结果
+
+            # 初始化 prd_version 和 prd_content 为 None
+            prd_version = None
+            prd_content = None
+
+            # 如果插入成功且提供了 prd_content
+            if request.prd_content:
+                # 查询 session_id 下现有的 prd_version（最大版本号）
+                cur.execute(
+                    "SELECT MAX(prd_version) FROM prd WHERE session_id = %s",
+                    (request.session_id,)
+                )
+                max_prd_version = cur.fetchone()[0]
+
+                # 如果没有版本记录，设置为 1
+                if max_prd_version is None:
+                    new_prd_version = 1
+                else:
+                    new_prd_version = max_prd_version + 1
+
+                # 插入到 prd 表
+                insert_prd_query = sql.SQL("""
+                    INSERT INTO prd (
+                        prd_version,
+                        conversation_id,
+                        session_id,
+                        prd_content,
+                        created_by
+                    )
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING prd_content, prd_version;
+                """)
+
+                cur.execute(
+                    insert_prd_query,
+                    (
+                        new_prd_version,            # 计算出的新版本号
+                        conversation_id,            # 关联的conversation_id
+                        request.session_id,         # 关联的session_id
+                        request.prd_content,        # PRD的内容
+                        current_user.username       # 创建人（假设current_user包含username字段）
+                    )
+                )
+
+                # 获取 prd_content 和 prd_version
+                prd_content, prd_version = cur.fetchone()
+
+                # 提交PRD插入事务
+                conn.commit()
 
         if result:
             # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
@@ -796,13 +851,14 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 "version": result[5],
                 "conversation_parent_id": result[6],
                 "conversation_child_version": result[7],
-                "dify_func_def": result[8],
+                "knowledge_graph": result[8],
                 "dify_func_des": result[9],
-                "dify_mod_des": result[10],
-                "dify_code": result[11],
-                "dify_id": result[12],
-                "preview_code": result[13],
-                "conversation_para_version": conversation_child_version  # 新增字段，返回更新后的父级子版本信息
+                "knowledge_id": result[10],
+                "dify_id": result[11],
+                "preview_code": result[12],
+                "conversation_para_version": conversation_child_version,  # 返回更新后的父级子版本信息
+                "prd_version": prd_version,  # 返回 PRD 的版本号
+                "prd_content": prd_content  # 返回 PRD 的内容
             }
         else:
             logger.error("Failed to fetch insert result")
@@ -979,14 +1035,29 @@ async def get_conversations(
                 # 查询当前对话信息
                 cur.execute("""
                     SELECT conversation_id, session_id, created_at, conversation_type, content, version,
-                           conversation_parent_id, conversation_child_version, dify_func_def, dify_func_des,
-                           dify_mod_des, dify_code, dify_id, preview_code
+                           conversation_parent_id, conversation_child_version, knowledge_graph, dify_func_des,
+                           knowledge_id, dify_id, preview_code
                     FROM conversations
                     WHERE conversation_id = %s
                 """, (current_id,))
                 conversation_data = cur.fetchone()
 
                 if conversation_data:
+                    # 查询 prd_content 和 prd_version（如果有的话）
+                    prd_content = None
+                    prd_version = None
+                    cur.execute("""
+                        SELECT prd_content, prd_version
+                        FROM prd
+                        WHERE session_id = %s AND conversation_id = %s
+                        ORDER BY prd_version DESC
+                        LIMIT 1
+                    """, (session_id, current_id))
+                    prd_result = cur.fetchone()
+
+                    if prd_result:
+                        prd_content, prd_version = prd_result     
+                                       
                     # 如果存在父级对话，获取父级的conversation_child_version
                     conversation_para_version = None
                     if conversation_data[6]:  # conversation_parent_id
@@ -1018,12 +1089,13 @@ async def get_conversations(
                         version=conversation_data[5],
                         conversation_parent_id=conversation_data[6],
                         conversation_para_version=conversation_para_version,
-                        dify_func_def=conversation_data[8],
+                        knowledge_graph=conversation_data[8],
                         dify_func_des=conversation_data[9],
-                        dify_mod_des=conversation_data[10],
-                        dify_code=conversation_data[11],
-                        dify_id=conversation_data[12],
-                        preview_code=conversation_data[13],
+                        prd_content=prd_content,  # 添加prd_content
+                        prd_version=prd_version,  # 添加prd_version
+                        knowledge_id=conversation_data[10],
+                        dify_id=conversation_data[11],
+                        preview_code=conversation_data[12],
                     )
                     conversations.append(conversation)
 
@@ -1080,6 +1152,12 @@ async def delete_session(
                 detail="You do not have permission to delete this session."
             )
 
+        # 删除 prd 表中与 session_id 相关的记录
+        delete_prd_query = """
+        DELETE FROM prd WHERE session_id = %s
+        """
+        cur.execute(delete_prd_query, (session_id,))
+
         # 开始删除操作，删除 conversations 表中对应的记录
         delete_conversations_query = """
         DELETE FROM conversations WHERE session_id = %s
@@ -1096,8 +1174,8 @@ async def delete_session(
         conn.commit()
 
         # 返回删除成功的消息
-        logger.info(f"Session {session_id} and its conversations deleted for user {user_id}")
-        return {"message": "Session and its conversations deleted successfully"}
+        logger.info(f"Session {session_id} and its conversations, prd records deleted for user {user_id}")
+        return {"message": "Session and its conversations, prd records deleted successfully"}
 
     except HTTPException as http_exc:
         # 捕获并抛出自定义的 HTTP 错误
@@ -1216,7 +1294,6 @@ async def update_password(
         if conn:
             db_pool.putconn(conn)  # 将连接放回连接池
 
-# 更新对话接口
 @app.put("/conversations/{conversation_id}")
 async def update_conversation(
     conversation_id: uuid.UUID,  # 通过 URL 参数传递 conversation_id
@@ -1233,70 +1310,61 @@ async def update_conversation(
         )
 
     conn = None
-
-    # 获取数据库连接
-    conn = get_db_connection()
-
     try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cur = conn.cursor()
+
         # 查询是否存在该 conversation_id 和 session_id 对应的对话
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT conversation_id, session_id FROM conversations WHERE conversation_id = %s AND session_id = %s",
-                (str(conversation_id), str(request.session_id))  # 转换 UUID 为字符串
+        cur.execute(
+            "SELECT conversation_id, session_id FROM conversations WHERE conversation_id = %s AND session_id = %s",
+            (str(conversation_id), str(request.session_id))  # 确保 UUID 转换为字符串传递
+        )
+        conversation_record = cur.fetchone()
+
+        if not conversation_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found for the given session_id"
             )
-            conversation_record = cur.fetchone()
 
-            if not conversation_record:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Conversation not found for the given session_id"
-                )
-
-            # 构造更新字段的动态 SQL
-            update_fields = []
-            update_values = []
-
-            if request.dify_func_def is not None:
-                update_fields.append("dify_func_def = %s")
-                update_values.append(request.dify_func_def)
-
-            if request.dify_func_des is not None:
-                update_fields.append("dify_func_des = %s")
-                update_values.append(request.dify_func_des)
-
-            if request.dify_mod_des is not None:
-                update_fields.append("dify_mod_des = %s")
-                update_values.append(request.dify_mod_des)
-
-            if request.dify_code is not None:
-                update_fields.append("dify_code = %s")
-                update_values.append(request.dify_code)
-
-            # 如果没有需要更新的字段，返回错误
-            if not update_fields:
-                return {
-                    "message": "No fields were updated, but the request was successful."
-                }
-
-            # 将 conversation_id 添加到更新字段的参数中
-            update_values.append(str(conversation_id))
-
-            # 更新语句
-            update_query = sql.SQL("""
+        # 1. 构建更新字段，分别更新每个字段
+        if request.knowledge_graph is not None:
+            cur.execute("""
                 UPDATE conversations
-                SET {}
+                SET knowledge_graph = %s
                 WHERE conversation_id = %s
-            """).format(sql.SQL(", ").join(map(sql.SQL, update_fields)))
+            """, (request.knowledge_graph, str(conversation_id)))  # 使用字符串形式的 UUID
 
-            with conn.cursor() as cur:
-                # 执行更新操作
-                cur.execute(update_query, tuple(update_values))
-                conn.commit()
+        if request.dify_func_des is not None:
+            cur.execute("""
+                UPDATE conversations
+                SET dify_func_des = %s
+                WHERE conversation_id = %s
+            """, (request.dify_func_des, str(conversation_id)))  # 使用字符串形式的 UUID
 
-        return {"message": "Conversation updated successfully"}
+        if request.knowledge_id is not None:
+            cur.execute("""
+                UPDATE conversations
+                SET knowledge_id = %s
+                WHERE conversation_id = %s
+            """, (request.knowledge_id, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        # 2. 更新 prd 表的 prd_content（如果有更新）
+        if request.prd_content is not None:
+            cur.execute("""
+                UPDATE prd
+                SET prd_content = %s
+                WHERE conversation_id = %s
+            """, (request.prd_content, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        # 提交事务
+        conn.commit()
+
+        return {"message": "Conversation and prd content updated successfully"}
 
     except HTTPException as e:
-        # 捕获已定义的 HTTPException，直接抛出
+        # 捕获并抛出 HTTP 异常
         raise e
 
     except Exception as e:
@@ -1305,4 +1373,4 @@ async def update_conversation(
 
     finally:
         if conn:
-            db_pool.putconn(conn)
+            db_pool.putconn(conn)  # 将连接放回连接池
