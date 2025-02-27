@@ -169,6 +169,9 @@ class UpdateSessionNameRequest(BaseModel):
     name: str
     user_id: int
 
+class PrdResponse(BaseModel):
+    prd_content: str  # 返回的 prd_content 字段
+
 # 用于校验用户的密码
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
@@ -678,7 +681,6 @@ def create_session(request: SessionCreateRequest, current_user: UserInDB = Depen
         if conn:
             db_pool.putconn(conn)
 
-# 创建对话接口
 @app.post("/conversations")
 async def create_conversation(request: ConversationCreateRequest, current_user: UserInDB = Depends(get_current_user)):
     logger.info("User %s is creating a conversation for session_id: %s", current_user.user_id, request.session_id)
@@ -691,12 +693,12 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         )
 
     conn = None
-    
-    # 获取数据库连接
-    conn = get_db_connection()
     created_at = datetime.now()  # 获取当前时间
-
     try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cur = conn.cursor()  # 创建一个游标
+
         # 处理可选字段的默认值
         conversation_id = str(request.conversation_id or uuid.uuid4())  # 转换 UUID 为字符串
         conversation_child_version = None
@@ -704,49 +706,48 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
 
         # 如果有父对话 ID，则更新父级的 conversation_child_version 字段
         if request.conversation_parent_id:
-            with conn.cursor() as cur:
-                # 查询父级对话的当前 conversation_child_version
+            # 查询父级对话的当前 conversation_child_version
+            cur.execute(
+                "SELECT conversation_child_version FROM conversations WHERE conversation_id = %s",
+                (str(request.conversation_parent_id),)  # 转换 UUID 为字符串
+            )
+            parent_record = cur.fetchone()
+            logger.info("Fetched parent_record: %s", parent_record)
+
+            if parent_record:
+                existing_child_version = parent_record[0]
+                logger.info("Existing child version type: %s, value: %s", type(existing_child_version), existing_child_version)
+
+                if existing_child_version:
+                    # 如果已经是字符串形式的 JSON，先进行解析
+                    if isinstance(existing_child_version, str):
+                        child_versions = json.loads(existing_child_version)
+                    else:
+                        child_versions = existing_child_version
+                else:
+                    child_versions = {}
+                
+                # 自动生成版本号：找到最高版本号并加一
+                if child_versions:
+                    max_version = max(int(ver) for ver in child_versions.keys())
+                    version = max_version + 1
+                else:
+                    version = 1
+
+                # 更新子版本信息
+                child_versions[str(version)] = conversation_id
+                conversation_child_version = json.dumps(child_versions)  # 将字典转换回 JSON 字符串
+                logger.info("Updated conversation_child_version: %s", conversation_child_version)
+
+                # 更新父级 conversation 的 conversation_child_version
                 cur.execute(
-                    "SELECT conversation_child_version FROM conversations WHERE conversation_id = %s",
-                    (str(request.conversation_parent_id),)  # 转换 UUID 为字符串
+                    "UPDATE conversations SET conversation_child_version = %s WHERE conversation_id = %s",
+                    (conversation_child_version, str(request.conversation_parent_id))  # 转换 UUID 为字符串
                 )
-                parent_record = cur.fetchone()
-                logger.info("Fetched parent_record: %s", parent_record)
+                logger.info("Updated parent conversation's child version in the database")
 
-                if parent_record:
-                    existing_child_version = parent_record[0]
-                    logger.info("Existing child version type: %s, value: %s", type(existing_child_version), existing_child_version)
-
-                    if existing_child_version:
-                        # 如果已经是字符串形式的 JSON，先进行解析
-                        if isinstance(existing_child_version, str):
-                            child_versions = json.loads(existing_child_version)
-                        else:
-                            child_versions = existing_child_version
-                    else:
-                        child_versions = {}
-                    
-                    # 自动生成版本号：找到最高版本号并加一
-                    if child_versions:
-                        max_version = max(int(ver) for ver in child_versions.keys())
-                        version = max_version + 1
-                    else:
-                        version = 1
-
-                    # 更新子版本信息
-                    child_versions[str(version)] = conversation_id
-                    conversation_child_version = json.dumps(child_versions)  # 将字典转换回 JSON 字符串
-                    logger.info("Updated conversation_child_version: %s", conversation_child_version)
-
-                    # 更新父级 conversation 的 conversation_child_version
-                    cur.execute(
-                        "UPDATE conversations SET conversation_child_version = %s WHERE conversation_id = %s",
-                        (conversation_child_version, str(request.conversation_parent_id))  # 转换 UUID 为字符串
-                    )
-                    logger.info("Updated parent conversation's child version in the database")
-
-        # 准备插入语句
-        insert_query = sql.SQL("""
+        # 插入对话内容到 conversations 表
+        insert_query = sql.SQL(""" 
             INSERT INTO conversations (
                 conversation_id,
                 session_id,
@@ -767,86 +768,84 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         """)
 
         # 插入数据
-        with conn.cursor() as cur:
+        cur.execute(
+            insert_query,
+            (
+                conversation_id,             # 处理后的 UUID（字符串形式）
+                request.session_id,          # 会话ID
+                created_at,                  # 当前时间
+                request.conversation_type,   # 对话类型
+                request.content,             # 文本内容
+                version,                     # 版本
+                str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
+                None,                        # 更新后的子版本信息
+                request.knowledge_graph,     # 可选字段 knowledge_graph
+                request.dify_func_des,       # 可选字段 dify_func_des
+                request.knowledge_id,        # 可选字段 knowledge_id
+                request.dify_id,             # 可选字段 dify_id
+                request.preview_code         # 可选字段 preview_code
+            )
+        )
+
+        # 提交事务
+        conn.commit()
+        result = cur.fetchone()  # 获取插入的返回结果
+
+        # 更新 sessions 表的 end_time 字段
+        cur.execute(
+            "UPDATE sessions SET end_time = %s WHERE session_id = %s",
+            (created_at, request.session_id)
+        )
+        conn.commit()
+
+        # 初始化 prd_version 和 prd_content 为 None
+        prd_version = None
+        prd_content = None
+
+        # 如果插入成功且提供了 prd_content
+        if request.prd_content:
+            # 查询 session_id 下现有的 prd_version（最大版本号）
             cur.execute(
-                insert_query,
+                "SELECT MAX(prd_version) FROM prd WHERE session_id = %s",
+                (request.session_id,)
+            )
+            max_prd_version = cur.fetchone()[0]
+
+            # 如果没有版本记录，设置为 1
+            if max_prd_version is None:
+                new_prd_version = 1
+            else:
+                new_prd_version = max_prd_version + 1
+
+            # 插入到 prd 表
+            insert_prd_query = sql.SQL("""
+                INSERT INTO prd (
+                    prd_version,
+                    conversation_id,
+                    session_id,
+                    prd_content,
+                    created_by
+                )
+                VALUES (%s, %s, %s, %s, %s)
+                RETURNING prd_content, prd_version;
+            """)
+
+            cur.execute(
+                insert_prd_query,
                 (
-                    conversation_id,             # 处理后的 UUID（字符串形式）
-                    request.session_id,          # 会话ID
-                    created_at,                  # 当前时间
-                    request.conversation_type,   # 对话类型
-                    request.content,             # 文本内容
-                    version,                     # 版本
-                    str(request.conversation_parent_id) if request.conversation_parent_id else None,  # 转换 UUID 为字符串
-                    None,                        # 更新后的子版本信息
-                    request.knowledge_graph,       # 可选字段 knowledge_graph
-                    request.dify_func_des,       # 可选字段 dify_func_des
-                    request.knowledge_id,           # 可选字段 knowledge_id
-                    request.dify_id,             # 可选字段 dify_id
-                    request.preview_code         # 可选字段 preview_code
+                    new_prd_version,            # 计算出的新版本号
+                    conversation_id,            # 关联的conversation_id
+                    request.session_id,         # 关联的session_id
+                    request.prd_content,        # PRD的内容
+                    current_user.username       # 创建人（假设current_user包含username字段）
                 )
             )
 
-            # 提交事务
+            # 获取 prd_content 和 prd_version
+            prd_content, prd_version = cur.fetchone()
+
+            # 提交PRD插入事务
             conn.commit()
-            result = cur.fetchone()  # 获取插入的返回结果
-
-            # 更新 sessions 表的 end_time 字段
-            with conn.cursor() as cur:
-                cur.execute(
-                    "UPDATE sessions SET end_time = %s WHERE session_id = %s",
-                    (created_at, request.session_id)
-                )
-                conn.commit()
-
-            # 初始化 prd_version 和 prd_content 为 None
-            prd_version = None
-            prd_content = None
-
-            # 如果插入成功且提供了 prd_content
-            if request.prd_content:
-                # 查询 session_id 下现有的 prd_version（最大版本号）
-                cur.execute(
-                    "SELECT MAX(prd_version) FROM prd WHERE session_id = %s",
-                    (request.session_id,)
-                )
-                max_prd_version = cur.fetchone()[0]
-
-                # 如果没有版本记录，设置为 1
-                if max_prd_version is None:
-                    new_prd_version = 1
-                else:
-                    new_prd_version = max_prd_version + 1
-
-                # 插入到 prd 表
-                insert_prd_query = sql.SQL("""
-                    INSERT INTO prd (
-                        prd_version,
-                        conversation_id,
-                        session_id,
-                        prd_content,
-                        created_by
-                    )
-                    VALUES (%s, %s, %s, %s, %s)
-                    RETURNING prd_content, prd_version;
-                """)
-
-                cur.execute(
-                    insert_prd_query,
-                    (
-                        new_prd_version,            # 计算出的新版本号
-                        conversation_id,            # 关联的conversation_id
-                        request.session_id,         # 关联的session_id
-                        request.prd_content,        # PRD的内容
-                        current_user.username       # 创建人（假设current_user包含username字段）
-                    )
-                )
-
-                # 获取 prd_content 和 prd_version
-                prd_content, prd_version = cur.fetchone()
-
-                # 提交PRD插入事务
-                conn.commit()
 
         if result:
             # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
@@ -878,6 +877,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
     finally:
         if conn:
             db_pool.putconn(conn)
+
 
 # 查询会话的接口
 @app.get("/sessions", response_model=List[dict])
@@ -1377,6 +1377,58 @@ async def update_conversation(
 
     except Exception as e:
         logger.error(f"Error updating conversation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    finally:
+        if conn:
+            db_pool.putconn(conn)  # 将连接放回连接池
+
+@app.get("/get_prd", response_model=PrdResponse)
+async def get_prd(user_id: int):
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+
+        # 查询该 user_id 最新的 session_id
+        with conn.cursor() as cur:
+            # 获取 end_time 最新的 session_id (按用户筛选)
+            cur.execute("""
+                SELECT session_id
+                FROM sessions
+                WHERE user_id = %s
+                ORDER BY end_time DESC
+                LIMIT 1
+            """, (user_id,))
+            session_id_record = cur.fetchone()
+
+            if not session_id_record:
+                raise HTTPException(status_code=404, detail="No sessions found for the user")
+
+            session_id = session_id_record[0]
+            print
+            # 查询该 session_id 下 prd_version 最大的 prd_content
+            cur.execute("""
+                SELECT prd_content
+                FROM prd
+                WHERE session_id = %s
+                ORDER BY prd_version DESC
+                LIMIT 1
+            """, (session_id,))
+            prd_content_record = cur.fetchone()
+
+            if not prd_content_record:
+                raise HTTPException(status_code=404, detail="No PRD content found for the session")
+
+            # 返回 prd_content
+            return {"prd_content": prd_content_record[0]}
+
+    except HTTPException as e:
+        # 捕获并抛出 HTTP 异常
+        raise e
+
+    except Exception as e:
+        logger.error(f"Error retrieving PRD: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
     finally:
