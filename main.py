@@ -791,6 +791,14 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
             conn.commit()
             result = cur.fetchone()  # 获取插入的返回结果
 
+            # 更新 sessions 表的 end_time 字段
+            with conn.cursor() as cur:
+                cur.execute(
+                    "UPDATE sessions SET end_time = %s WHERE session_id = %s",
+                    (created_at, request.session_id)
+                )
+                conn.commit()
+
             # 初始化 prd_version 和 prd_content 为 None
             prd_version = None
             prd_content = None
