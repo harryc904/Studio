@@ -135,6 +135,7 @@ class ConversationCreateRequest(BaseModel):
     knowledge_id: Optional[str] = None
     preview_code: Optional[str] = None
     conversation_id: Optional[uuid.UUID] = None
+    restore_version: Optional[int] = None
 
 class ConversationUpdateRequest(BaseModel):
     user_id: int  # 用户 ID，用于验证当前登录用户
@@ -162,6 +163,8 @@ class ConversationResponse(BaseModel):
     knowledge_id: Optional[str] = None
     dify_id: Optional[str] = None
     preview_code: Optional[str] = None
+    latest: Optional[int]  # PRD是否为最新版本
+    restore_version: Optional[int]  # 恢复的版本号
 
 # 定义请求体的数据模型
 class UpdateSessionNameRequest(BaseModel):
@@ -801,6 +804,8 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         # 初始化 prd_version 和 prd_content 为 None
         prd_version = None
         prd_content = None
+        latest = None
+        restore_version = None
 
         # 如果插入成功且提供了 prd_content
         if request.prd_content:
@@ -818,18 +823,24 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 new_prd_version = max_prd_version + 1
 
             # 插入到 prd 表
-            insert_prd_query = sql.SQL("""
+            insert_prd_query = sql.SQL(""" 
                 INSERT INTO prd (
                     prd_version,
                     conversation_id,
                     session_id,
                     prd_content,
-                    created_by
+                    created_by,
+                    latest,
+                    restore_version
                 )
-                VALUES (%s, %s, %s, %s, %s)
-                RETURNING prd_content, prd_version;
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING prd_content, prd_version, latest, restore_version;
             """)
 
+            # 如果前端传入 restore_version，使用传入值，否则为 NULL
+            restore_version_value = request.restore_version if request.restore_version is not None else None
+
+            # 插入数据到 prd 表
             cur.execute(
                 insert_prd_query,
                 (
@@ -837,15 +848,25 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                     conversation_id,            # 关联的conversation_id
                     request.session_id,         # 关联的session_id
                     request.prd_content,        # PRD的内容
-                    current_user.username       # 创建人（假设current_user包含username字段）
+                    current_user.username,      # 创建人（假设current_user包含username字段）
+                    1,                          # 最新版本设置为 1
+                    restore_version_value      # restore_version 如果提供，则存储，否则为 null
                 )
             )
 
             # 获取 prd_content 和 prd_version
-            prd_content, prd_version = cur.fetchone()
+            prd_content, prd_version, latest, restore_version = cur.fetchone()
 
             # 提交PRD插入事务
             conn.commit()
+
+            # 更新上一版本的 prd 表格，将其 latest 字段设置为 0
+            if max_prd_version is not None:
+                cur.execute(
+                    "UPDATE prd SET latest = 0 WHERE session_id = %s AND prd_version = %s",
+                    (request.session_id, max_prd_version)
+                )
+                conn.commit()
 
         if result:
             # 将结果返回给前端，包括更新后的父级 conversation_child_version 信息
@@ -865,7 +886,9 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
                 "preview_code": result[12],
                 "conversation_para_version": conversation_child_version,  # 返回更新后的父级子版本信息
                 "prd_version": prd_version,  # 返回 PRD 的版本号
-                "prd_content": prd_content  # 返回 PRD 的内容
+                "prd_content": prd_content,  # 返回 PRD 的内容
+                "latest": latest,
+                "restore_version": restore_version
             }
         else:
             logger.error("Failed to fetch insert result")
@@ -1054,8 +1077,10 @@ async def get_conversations(
                     # 查询 prd_content 和 prd_version（如果有的话）
                     prd_content = None
                     prd_version = None
-                    cur.execute("""
-                        SELECT prd_content, prd_version
+                    latest = None
+                    restore_version = None                    
+                    cur.execute(""" 
+                        SELECT prd_content, prd_version, latest, restore_version
                         FROM prd
                         WHERE session_id = %s AND conversation_id = %s
                         ORDER BY prd_version DESC
@@ -1064,7 +1089,7 @@ async def get_conversations(
                     prd_result = cur.fetchone()
 
                     if prd_result:
-                        prd_content, prd_version = prd_result     
+                        prd_content, prd_version, latest, restore_version = prd_result     
                                        
                     # 如果存在父级对话，获取父级的conversation_child_version
                     conversation_para_version = None
@@ -1101,9 +1126,11 @@ async def get_conversations(
                         dify_func_des=conversation_data[9],
                         prd_content=prd_content,  # 添加prd_content
                         prd_version=prd_version,  # 添加prd_version
+                        latest=latest,  # 返回最新的标记
+                        restore_version=restore_version,  # 返回恢复版本号                        
                         knowledge_id=conversation_data[10],
                         dify_id=conversation_data[11],
-                        preview_code=conversation_data[12],
+                        preview_code=conversation_data[12]
                     )
                     conversations.append(conversation)
 
