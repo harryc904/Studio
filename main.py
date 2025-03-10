@@ -13,7 +13,6 @@ from tencentcloud.common.exception.tencent_cloud_sdk_exception import (
     TencentCloudSDKException,
 )
 import random
-import redis
 from psycopg2 import sql
 from psycopg2 import pool  # 导入连接池模块
 import uuid
@@ -26,11 +25,7 @@ import json
 # psycopg2.extras.register_uuid()
 
 # 初始化 logging 配置
-logging.basicConfig(
-    filename="/home/lighthouse/studio/debuglog/backend.log",  # 输出日志的文件
-    level=logging.DEBUG,  # 日志级别为 DEBUG
-    format="%(asctime)s - %(levelname)s - %(message)s",  # 日志格式
-)
+logging.basicConfig(level=logging.DEBUG)  # 日志基础配置
 
 logger = logging.getLogger(__name__)  # 创建日志记录器
 
@@ -57,10 +52,6 @@ LOGIN_TEMPLATE_ID = "2354925"  # 登录模板 ID
 REGION = "ap-guangzhou"  # 默认区域
 SMS_APPID = "1400960709"  # 短信 SDK App ID
 
-# 配置 Redis?
-redis_client = redis.StrictRedis(
-    host="43.129.162.15", port=6379, db=0, decode_responses=True, socket_timeout=10
-)
 
 # JWT 配置
 SECRET_KEY = "aP6pUzRWg9ae9UojkDPFGXBcFvRqRv7UwTiTe3LMzKk"

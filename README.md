@@ -24,3 +24,7 @@ uv add <package>
 ```
 uv add ruff
 ```
+
+```
+uv pip install tencentcloud-sdk-python
+```

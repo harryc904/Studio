@@ -7,5 +7,8 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115.11",
     "jose>=1.0.0",
+    "passlib>=1.7.4",
+    "psycopg2>=2.9.10",
+    "python-jose>=3.4.0",
     "ruff>=0.9.10",
 ]
