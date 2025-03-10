@@ -18,6 +18,12 @@ from psycopg2 import pool  # 导入连接池模块
 import uuid
 import logging
 import json
+import os
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
+
 # from uuid import UUID
 # import psycopg2.extras
 
@@ -34,29 +40,29 @@ app = FastAPI()
 
 # 连接 PostgreSQL 数据库
 db_pool = pool.SimpleConnectionPool(
-    minconn=1,  # 最小连接数
-    maxconn=20,  # 最大连接数
-    dbname="StudioAIDB",
-    user="user_PpykNG",
-    password="password_jY6MwW",
-    host="43.129.162.15",
-    port="5432",
+    minconn=int(os.getenv("DB_MIN_CONNECTIONS")),
+    maxconn=int(os.getenv("DB_MAX_CONNECTIONS")),
+    dbname=os.getenv("DB_NAME"),
+    user=os.getenv("DB_USER"),
+    password=os.getenv("DB_PASSWORD"),
+    host=os.getenv("DB_HOST"),
+    port=os.getenv("DB_PORT"),
 )
 
 # 配置腾讯云 API 密钥（SecretId 和 SecretKey）
-SECRET_ID = "AKID75qOmwrY0DBvzvfBZjfNr8Bzuc5KKFyZ"
-SECRET_KEY1 = "RedS5YcYOFvOdeR0MUO5ZprD2e2DCyWp"
-SMS_SIGN = "上海仰望平凡科技"  # 短信签名
-REGISTER_TEMPLATE_ID = "2349714"  # 注册模板 ID
-LOGIN_TEMPLATE_ID = "2354925"  # 登录模板 ID
-REGION = "ap-guangzhou"  # 默认区域
-SMS_APPID = "1400960709"  # 短信 SDK App ID
+SECRET_ID = os.getenv("TENCENT_SECRET_ID")
+SECRET_KEY1 = os.getenv("TENCENT_SECRET_KEY")
+SMS_SIGN = os.getenv("SMS_SIGN")  # 短信签名
+REGISTER_TEMPLATE_ID = os.getenv("SMS_REGISTER_TEMPLATE_ID")  # 注册模板 ID
+LOGIN_TEMPLATE_ID = os.getenv("SMS_LOGIN_TEMPLATE_ID")  # 登录模板 ID
+REGION = os.getenv("SMS_REGION")  # 默认区域
+SMS_APPID = os.getenv("SMS_APP_ID")  # 短信 SDK App ID
 
 
 # JWT 配置
-SECRET_KEY = "aP6pUzRWg9ae9UojkDPFGXBcFvRqRv7UwTiTe3LMzKk"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 14400
+SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+ALGORITHM = os.getenv("JWT_ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("JWT_ACCESS_TOKEN_EXPIRE_MINUTES"))
 
 # 加密上下文，用于密码加密和校验
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
