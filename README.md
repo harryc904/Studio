@@ -28,3 +28,8 @@ uv add ruff
 ```
 uv pip install tencentcloud-sdk-python
 ```
+
+
+```
+uv pip freeze > requirements.txt
+```
