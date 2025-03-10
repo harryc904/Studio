@@ -35,8 +35,8 @@ logging.basicConfig(level=logging.DEBUG)  # 日志基础配置
 
 logger = logging.getLogger(__name__)  # 创建日志记录器
 
-# 创建FastAPI应用实例
-app = FastAPI()
+# 创建FastAPI应用实例，指定Swagger UI路径为 /swagger，Redoc路径为 /redoc
+app = FastAPI(docs_url="/swagger", redoc_url="/redoc", openapi_url="/openapi.json")
 
 # 连接 PostgreSQL 数据库
 db_pool = pool.SimpleConnectionPool(
