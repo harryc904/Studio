@@ -7,10 +7,11 @@ app = FastAPI()
 # 配置日志
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    filename='/home/lighthouse/studio/debuglog/backend.log',  # 将日志输出到指定文件
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    filename="/home/lighthouse/studio/debuglog/backend.log",  # 将日志输出到指定文件
 )
 logger = logging.getLogger(__name__)
+
 
 @app.post("/webhook")
 async def webhook(request: Request):

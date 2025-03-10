@@ -1,9 +1,26 @@
-<<<<<<< HEAD
-# My GitHub Project
-This is my first.
-=======
 # Studio
+
 Studio python backend
-# test webhook
-test Harry remote push
->>>>>>> 14dae3a21cda4f050f19adefa01ab27941395f3a
+
+本项目使用 uv 进行包管理。
+
+# 安装 uv
+```
+pip install uv
+```
+
+# 初始化项目
+```
+uv init
+```
+
+
+# 添加依赖包
+```
+uv add <package>
+```
+
+# 添加检查工具：用于检查format和Linter
+```
+uv add ruff
+```
