@@ -7,6 +7,8 @@ venv/
 env/
 .env
 *.env
+dist/
+studio.egg-info/
 
 # 编辑器相关忽略项
 .idea/
