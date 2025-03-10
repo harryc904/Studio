@@ -1,4 +1,4 @@
---only-binary=tencentcloud-sdk-python tencentcloud-sdk-python==3.0.1334
+tencentcloud-sdk-python==3.0.1334
 annotated-types==0.7.0
 anyio==4.8.0
 certifi==2025.1.31
