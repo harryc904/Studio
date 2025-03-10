@@ -4,10 +4,5 @@
       "source": "/(.*)",
       "destination": "/api/main"
     }
-  ],
-  "build": {
-    "env": {
-      "PIP_FLAGS": "--prefer-binary"
-    }
-  }
+  ]
 }
