@@ -10,5 +10,9 @@ dependencies = [
     "passlib>=1.7.4",
     "psycopg2>=2.9.10",
     "python-jose>=3.4.0",
+]
+
+[dependency-groups]
+dev = [
     "ruff>=0.9.10",
 ]
