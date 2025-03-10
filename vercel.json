@@ -1,6 +1,13 @@
 {
-    "rewrites": [
-      { "source": "/(.*)", "destination": "/api/main" }
-    ]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/main"
+    }
+  ],
+  "build": {
+    "env": {
+      "PIP_FLAGS": "--prefer-binary"
+    }
   }
-  
+}
