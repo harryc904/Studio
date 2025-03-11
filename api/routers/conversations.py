@@ -6,7 +6,7 @@ import uuid
 from ..schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
 from ..schemas.user import UserInDB
 from ..services.auth_service import get_current_user
-from ..services.conversation_service import create_conversation_service, get_conversation_by_id_service, get_session_conversations_service, update_conversation_service
+from ..services.conversation_service import create_conversation_service, get_conversations_service, get_session_conversations_service, update_conversation_service
 from ..config import logger
 
 router = APIRouter(prefix="/conversations", tags=["对话管理"])
@@ -51,7 +51,7 @@ async def get_conversation_by_id(conversation_id: uuid.UUID, current_user: UserI
     
     # 调用服务层获取单个对话
     try:
-        conversation = await get_conversation_by_id_service(str(conversation_id), current_user.user_id)
+        conversation = await get_conversations_service(str(conversation_id), current_user.user_id)
         if not conversation:
             raise HTTPException(status_code=404, detail="Conversation not found")
         return conversation
