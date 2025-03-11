@@ -14,7 +14,7 @@ from tencentcloud.common.exception.tencent_cloud_sdk_exception import (
 )
 import random
 from psycopg import sql
-from psycopg import pool  # 导入连接池模块
+from psycopg_pool import ConnectionPool
 import uuid
 import logging
 import json
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)  # 创建日志记录器
 app = FastAPI(docs_url="/swagger", redoc_url="/redoc", openapi_url="/openapi.json")
 
 # 连接 PostgreSQL 数据库
-db_pool = pool.SimpleConnectionPool(
+db_pool = ConnectionPool.SimpleConnectionPool(
     minconn=int(os.getenv("DB_MIN_CONNECTIONS")),
     maxconn=int(os.getenv("DB_MAX_CONNECTIONS")),
     dbname=os.getenv("DB_NAME"),
