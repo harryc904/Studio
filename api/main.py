@@ -39,14 +39,10 @@ logger = logging.getLogger(__name__)  # 创建日志记录器
 app = FastAPI(docs_url="/swagger", redoc_url="/redoc", openapi_url="/openapi.json")
 
 # 连接 PostgreSQL 数据库
-db_pool = ConnectionPool.SimpleConnectionPool(
-    minconn=int(os.getenv("DB_MIN_CONNECTIONS")),
-    maxconn=int(os.getenv("DB_MAX_CONNECTIONS")),
-    dbname=os.getenv("DB_NAME"),
-    user=os.getenv("DB_USER"),
-    password=os.getenv("DB_PASSWORD"),
-    host=os.getenv("DB_HOST"),
-    port=os.getenv("DB_PORT"),
+db_pool = ConnectionPool(
+    conninfo=f"dbname={os.getenv('DB_NAME')} user={os.getenv('DB_USER')} password={os.getenv('DB_PASSWORD')} host={os.getenv('DB_HOST')} port={os.getenv('DB_PORT')}",
+    min_size=int(os.getenv("DB_MIN_CONNECTIONS")),
+    max_size=int(os.getenv("DB_MAX_CONNECTIONS")),
 )
 
 # 配置腾讯云 API 密钥（SecretId 和 SecretKey）
