@@ -13,7 +13,8 @@ from ..services.auth_service import (
     get_current_user,
     get_password_hash,
     get_user_by_phone,
-    get_user_from_db
+    get_user_from_db,
+    register_user_service
 )
 from ..utils.sms import get_verification_code, send_verification_code, store_verification_code
 from ..config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES, logger
