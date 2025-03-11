@@ -13,8 +13,8 @@ from tencentcloud.common.exception.tencent_cloud_sdk_exception import (
     TencentCloudSDKException,
 )
 import random
-from psycopg2 import sql
-from psycopg2 import pool  # 导入连接池模块
+from psycopg import sql
+from psycopg import pool  # 导入连接池模块
 import uuid
 import logging
 import json
