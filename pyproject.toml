@@ -37,6 +37,9 @@ dev = [
     "pytest-cov>=6.0.0",
     # 代码检查工具
     "ruff>=0.9.10",
+    # 静态检查工具
+    "mypy>=1.15.0",
+
 ]
 
 [tool.pytest.ini_options]
@@ -63,3 +66,9 @@ ignore = ["E501"]  # 忽略行长度限制
 quote-style = "double"
 indent-style = "space"
 docstring-code-format = true
+
+[tool.mypy]
+strict = true
+disallow_incomplete_defs = false
+disallow_untyped_defs = false
+disallow_untyped_calls = false
