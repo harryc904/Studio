@@ -6,7 +6,10 @@ from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSes
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
 from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service
-from api.config import logger
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 router = APIRouter(prefix="/sessions", tags=["会话管理"])
 

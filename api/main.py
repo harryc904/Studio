@@ -1,7 +1,6 @@
-import logging
-
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
+from api.utils.logger import get_logger
 
 # 导入配置
 from api.config import (
@@ -15,9 +14,8 @@ from api.config import (
 # 导入路由模块
 from api.routers import auth, conversations, sessions, users
 
-# 初始化 logging 配置
-logging.basicConfig(level=logging.DEBUG)  # 日志基础配置
-logger = logging.getLogger(__name__)  # 创建日志记录器
+# 导入日志模块
+logger = get_logger(__name__)
 
 # 创建FastAPI应用实例，指定Swagger UI路径和Redoc路径
 app = FastAPI(

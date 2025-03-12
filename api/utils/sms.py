@@ -14,9 +14,12 @@ from api.config import (
     LOGIN_TEMPLATE_ID,
     SMS_REGION,
     SMS_APPID,
-    logger
 )
 from .db import get_db_connection
+
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 # 发送验证码
 async def send_verification_code(phone_number: str, purpose: int):

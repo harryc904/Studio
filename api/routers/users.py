@@ -4,7 +4,10 @@ from typing import List
 from api.schemas.user import User, UserInDB
 from api.services.auth_service import get_current_user
 from api.services.user_service import get_user_by_id_service, update_user_service
-from api.config import logger
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 

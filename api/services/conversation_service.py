@@ -7,7 +7,10 @@ import json
 from api.utils.db import get_db_connection
 from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
 from api.schemas.user import UserInDB
-from api.config import logger
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # 创建对话服务
 async def create_conversation_service(request: ConversationCreateRequest, current_user: UserInDB) -> ConversationResponse:

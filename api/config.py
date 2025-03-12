@@ -1,14 +1,9 @@
-import logging
 import os
 
 from dotenv import load_dotenv
 
 # 加载环境变量
 load_dotenv()
-
-# 初始化 logging 配置
-logging.basicConfig(level=logging.DEBUG)  # 日志基础配置
-logger = logging.getLogger(__name__)  # 创建日志记录器
 
 # 数据库配置
 DB_NAME = os.getenv("DB_NAME")

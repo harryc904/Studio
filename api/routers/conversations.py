@@ -7,7 +7,10 @@ from api.schemas.conversation import ConversationCreateRequest, ConversationResp
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
 from api.services.conversation_service import create_conversation_service, get_conversations_service, get_session_conversations_service, update_conversation_service
-from api.config import logger
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 router = APIRouter(prefix="/conversations", tags=["对话管理"])
 

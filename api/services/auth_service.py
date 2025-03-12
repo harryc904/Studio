@@ -8,7 +8,11 @@ from api.schemas.user import User, UserInDB
 from api.schemas.auth import TokenData, UserRegisterRequest
 from api.utils.security import verify_password, get_password_hash, create_access_token
 from api.utils.db import get_db_connection
-from api.config import JWT_SECRET_KEY, JWT_ALGORITHM, logger
+from api.config import JWT_SECRET_KEY, JWT_ALGORITHM
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # 创建OAuth2密码验证流，指定登录端点
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")

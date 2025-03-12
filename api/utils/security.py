@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone  # 添加 timezone 导入
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional, Union
 
-from api.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES, logger
+from api.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 from api.schemas.auth import TokenData
 from api.schemas.user import UserInDB
 

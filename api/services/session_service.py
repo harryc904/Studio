@@ -4,7 +4,10 @@ from datetime import datetime
 
 from api.utils.db import get_db_connection
 from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
-from api.config import logger
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 # 创建会话服务
 async def create_session_service(request: SessionCreateRequest) -> SessionResponse:

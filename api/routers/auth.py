@@ -17,7 +17,10 @@ from api.services.auth_service import (
     register_user_service
 )
 from api.utils.sms import get_verification_code, send_verification_code, store_verification_code
-from api.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES, logger
+from api.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="", tags=["认证"])
 

@@ -1,11 +1,12 @@
 from psycopg_pool import ConnectionPool
 from fastapi import HTTPException
-import logging
+from api.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
 
 from api.config import DB_CONNECTION_STRING, DB_MIN_CONNECTIONS, DB_MAX_CONNECTIONS
 
-# 初始化日志记录器
-logger = logging.getLogger(__name__)
 
 # 创建数据库连接池
 db_pool = ConnectionPool(
