@@ -51,3 +51,17 @@ To remove a package, you can use uv remove:
 
 uv remove requests
 ```
+
+```
+Dependencies of the project are defined in several tables:
+项目依赖关系定义在多个表中：
+
+project.dependencies: Published dependencies.
+project.dependencies : 已发布依赖项。
+project.optional-dependencies: Published optional dependencies, or "extras".
+project.optional-dependencies : 发布可选依赖项，或“额外内容”。
+dependency-groups: Local dependencies for development.
+dependency-groups : 开发所需的本地依赖项。
+tool.uv.sources: Alternative sources for dependencies during development.
+tool.uv.sources : 开发期间依赖项的替代来源。
+```

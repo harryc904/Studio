@@ -1,4 +1,3 @@
-from datetime import timedelta
 import os
 from dotenv import load_dotenv
 import logging
