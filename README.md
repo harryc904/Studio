@@ -4,12 +4,12 @@ Studio python backend
 
 本项目使用 uv 进行包管理。
 
-# 安装 uv
+## 安装 uv
 ```
 pip install uv
 ```
 
-# 初始化项目
+## 初始化项目
 ```
 uv init
 ```
@@ -25,16 +25,17 @@ uv add package_name
 # 添加开发依赖
 uv add --dev package_name
 ```
-
 依赖配置位于 `pyproject.toml` 中，分为生产依赖和开发依赖两部分。
 
+---
 
-# 添加检查工具作为开发依赖：用于检查format和Linter
+
+添加检查工具作为开发依赖：用于检查format和Linter
 ```
 uv add --dev ruff
 ```
+导出依赖，便于vercel部署
 
-```
 ```
 uv pip freeze > requirements.txt
 ```
