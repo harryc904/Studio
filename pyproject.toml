@@ -4,18 +4,62 @@ version = "0.1.0"
 description = "Nebula studio project backend"
 readme = "README.md"
 requires-python = ">=3.12"
+# 项目核心依赖
 dependencies = [
+    # API框架
     "email-validator>=2.2.0",
     "fastapi>=0.115.11",
+    
+    # 安全相关
     "passlib>=1.7.4",
+    "python-jose>=3.4.0",
+    
+    # 数据库
     "psycopg-pool>=3.2.6",
     "psycopg[binary]>=3.2.5",
+    
+    # 工具库
     "pydantic>=2.10.6",
     "python-dotenv>=1.0.1",
-    "python-jose>=3.4.0",
+    
+    # 腾讯云服务
     "tencentcloud-sdk-python-common>=3.0.1335",
     "tencentcloud-sdk-python-sms>=3.0.1335",
 ]
 
+
 [dependency-groups]
-dev = []
+dev = [
+    # 测试工具
+    "httpx>=0.28.1",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=0.25.3",
+    "pytest-cov>=6.0.0",
+    # 代码检查工具
+    "ruff>=0.9.10",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --cov=api --cov-report=html"
+asyncio_mode = "auto"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+]
+
+# 添加 ignore 配置
+ignore = ["E501"]  # 忽略行长度限制
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+docstring-code-format = true

@@ -1,18 +1,19 @@
-from fastapi import FastAPI
-from fastapi.openapi.utils import get_openapi
 import logging
 
-# 导入路由模块
-from api.routers import auth, sessions, conversations, users
+from fastapi import FastAPI
+from fastapi.openapi.utils import get_openapi
 
 # 导入配置
 from api.config import (
-    APP_TITLE,
     APP_DESCRIPTION,
-    APP_VERSION,
     APP_DOCS_URL,
-    APP_REDOC_URL
+    APP_REDOC_URL,
+    APP_TITLE,
+    APP_VERSION,
 )
+
+# 导入路由模块
+from api.routers import auth, conversations, sessions, users
 
 # 初始化 logging 配置
 logging.basicConfig(level=logging.DEBUG)  # 日志基础配置
