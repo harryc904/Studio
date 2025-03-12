@@ -1,18 +1,12 @@
 from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
-from psycopg_pool import ConnectionPool
 import logging
-import os
-from dotenv import load_dotenv
 
 # 导入路由模块
 from api.routers import auth, sessions, conversations, users
 
 # 导入配置
 from api.config import (
-    DB_CONNECTION_STRING,
-    DB_MIN_CONNECTIONS,
-    DB_MAX_CONNECTIONS,
     APP_TITLE,
     APP_DESCRIPTION,
     APP_VERSION,
@@ -34,12 +28,6 @@ app = FastAPI(
     openapi_url="/openapi.json"
 )
 
-# 连接 PostgreSQL 数据库
-db_pool = ConnectionPool(
-    conninfo=DB_CONNECTION_STRING,
-    min_size=DB_MIN_CONNECTIONS,
-    max_size=DB_MAX_CONNECTIONS,
-)
 
 # 注册路由
 app.include_router(auth.router)
