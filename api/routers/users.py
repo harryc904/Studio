@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from typing import List
 
-from ..schemas.user import User, UserInDB
-from ..services.auth_service import get_current_user
-from ..services.user_service import get_user_by_id_service, update_user_service
-from ..config import logger
+from api.schemas.user import User, UserInDB
+from api.services.auth_service import get_current_user
+from api.services.user_service import get_user_by_id_service, update_user_service
+from api.config import logger
 
 router = APIRouter(prefix="/users", tags=["用户管理"])
 

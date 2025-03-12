@@ -4,9 +4,9 @@ from datetime import datetime, timedelta, timezone  # 添加 timezone 导入
 from fastapi.security import OAuth2PasswordBearer
 from typing import Optional, Union
 
-from ..config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES, logger
-from ..schemas.auth import TokenData
-from ..schemas.user import UserInDB
+from api.config import JWT_SECRET_KEY, JWT_ALGORITHM, JWT_ACCESS_TOKEN_EXPIRE_MINUTES, logger
+from api.schemas.auth import TokenData
+from api.schemas.user import UserInDB
 
 # 创建密码上下文，用于密码哈希和验证
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")

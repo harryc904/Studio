@@ -6,6 +6,14 @@
 uv add --dev pytest pytest-asyncio pytest-cov httpx
 ```
 
+
+这样设置后，您就可以开始编写和运行测试了。安装的组件包括：
+
+pytest: 测试框架本身
+pytest-asyncio: 用于测试异步代码
+pytest-cov: 用于生成测试覆盖率报告
+httpx: 用于测试 FastAPI 端点
+
 ## 运行测试
 ```bash
 pytest

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from datetime import datetime
 from typing import List
 
-from ..schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
-from ..schemas.user import UserInDB
-from ..services.auth_service import get_current_user
-from ..services.session_service import create_session_service, get_user_sessions_service, update_session_name_service
-from ..config import logger
+from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
+from api.schemas.user import UserInDB
+from api.services.auth_service import get_current_user
+from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service
+from api.config import logger
 
 router = APIRouter(prefix="/sessions", tags=["会话管理"])
 

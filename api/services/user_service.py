@@ -1,9 +1,9 @@
 from fastapi import HTTPException, status
 from typing import Optional
 
-from ..utils.db import get_db_connection
-from ..schemas.user import User
-from ..config import logger
+from api.utils.db import get_db_connection
+from api.schemas.user import User
+from api.config import logger
 
 # 根据用户ID获取用户信息
 async def get_user_by_id_service(user_id: int) -> Optional[User]:

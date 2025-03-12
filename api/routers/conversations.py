@@ -3,11 +3,11 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 
-from ..schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
-from ..schemas.user import UserInDB
-from ..services.auth_service import get_current_user
-from ..services.conversation_service import create_conversation_service, get_conversations_service, get_session_conversations_service, update_conversation_service
-from ..config import logger
+from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
+from api.schemas.user import UserInDB
+from api.services.auth_service import get_current_user
+from api.services.conversation_service import create_conversation_service, get_conversations_service, get_session_conversations_service, update_conversation_service
+from api.config import logger
 
 router = APIRouter(prefix="/conversations", tags=["对话管理"])
 

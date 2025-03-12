@@ -2,9 +2,9 @@ from fastapi import HTTPException, status
 from typing import List
 from datetime import datetime
 
-from ..utils.db import get_db_connection
-from ..schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
-from ..config import logger
+from api.utils.db import get_db_connection
+from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
+from api.config import logger
 
 # 创建会话服务
 async def create_session_service(request: SessionCreateRequest) -> SessionResponse:

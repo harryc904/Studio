@@ -119,3 +119,24 @@ Project：Studio
    - 为知识库访问添加权限控制
    
 这个结构设计保留了您现有项目的核心功能，同时扩展了 AI Agent 和知识库相关的功能模块，使项目更加模块化和可维护。
+
+## 导入规范
+
+我们在项目中采用绝对导入（absolute imports）而不是相对导入（relative imports），原因如下：
+
+1. 代码更明确，易于理解
+2. IDE 支持更好（特别是 VS Code 的 Pylance）
+3. 避免导入路径混淆
+4. 减少包结构变更带来的问题
+5. mypy 类型检查更可靠
+
+示例：
+```python
+# 推荐 (绝对导入)
+from api.schemas.user import UserInDB
+from api.services.auth_service import authenticate_user
+
+# 不推荐 (相对导入)
+from ..schemas.user import UserInDB
+from ..services.auth_service import authenticate_user
+```

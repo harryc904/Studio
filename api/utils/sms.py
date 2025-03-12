@@ -6,7 +6,7 @@ import random
 import json
 from datetime import datetime, timedelta
 
-from ..config import (
+from api.config import (
     TENCENT_SECRET_ID,
     TENCENT_SECRET_KEY,
     SMS_SIGN,
