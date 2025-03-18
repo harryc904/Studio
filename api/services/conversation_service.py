@@ -230,13 +230,6 @@ async def get_conversations_service(
     conversation_id: Optional[str],
     current_user: UserInDB
 ) -> List[ConversationResponse]:
-    # 验证请求中的 user_id 是否与当前登录的用户一致
-    if current_user.user_id != user_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User ID does not match the authenticated user's ID",
-        )
-
     conn = None
 
     try:
@@ -394,7 +387,7 @@ async def get_conversations_service(
 
     finally:
         if conn:
-            db_pool.putconn(conn)  # 将连接放回连接池
+            conn.close()
 
 # 获取PRD
 async def get_prd_service(user_id: int) -> PrdResponse:
