@@ -43,4 +43,18 @@ async def get_conversations(
     current_user: UserInDB = Depends(get_current_user)
 ):
     logger.info("User %s is querying conversations for session_id: %s", user_id, session_id)
-    return await get_conversations_service(session_id, user_id, conversation_id, current_user)
+    
+    # 验证请求中的 user_id 是否与当前登录的用户一致
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID"
+        )
+    
+    # 调用服务层获取对话
+    try:
+        conversations = await get_conversations_service(session_id, user_id, conversation_id, current_user)
+        return conversations
+    except Exception as e:
+        logger.error(f"Error querying conversations: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
