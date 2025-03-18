@@ -16,8 +16,9 @@ async def create_session_service(request: SessionCreateRequest) -> SessionRespon
         # 获取数据库连接
         conn = get_db_connection()
         with conn.cursor() as cur:
-            # 获取当前时间作为 start_time
+            # 获取当前时间作为 start_time 和 end_time
             start_time = datetime.now()
+            end_time = datetime.now()
             # 如果 session_name 没有传入，则生成默认的名称
             session_name = (
                 request.session_name
@@ -27,11 +28,11 @@ async def create_session_service(request: SessionCreateRequest) -> SessionRespon
 
             # 插入新的会话数据到 sessions 表
             insert_query = """
-                INSERT INTO sessions (user_id, session_name, start_time)
-                VALUES (%s, %s, %s)
+                INSERT INTO sessions (user_id, session_name, start_time, end_time)
+                VALUES (%s, %s, %s, %s)
                 RETURNING session_id, user_id, session_name, start_time, end_time;
             """
-            cur.execute(insert_query, (request.user_id, session_name, start_time))
+            cur.execute(insert_query, (request.user_id, session_name, start_time, end_time))
 
             # 提交事务
             conn.commit()
