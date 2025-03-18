@@ -5,7 +5,7 @@ from typing import List
 from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
-from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service
+from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service，delete_session_service
 from api.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -68,3 +68,16 @@ async def update_session_name(request: UpdateSessionNameRequest, current_user: U
     except Exception as e:
         logger.error(f"Error updating session name: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# 删除会话接口
+@router.delete("/{session_id}", response_model=dict)
+async def delete_session(session_id: int, user_id: int, current_user: UserInDB = Depends(get_current_user)):
+    # 验证请求中的 user_id 是否与当前登录的用户一致
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID",
+        )
+    
+    # 调用服务层删除会话
+    return await delete_session_service(session_id, user_id)
