@@ -223,78 +223,20 @@ async def create_conversation_service(request: ConversationCreateRequest, curren
         if conn:
             conn.close()
 
-# 获取会话的所有对话
-async def get_session_conversations_service(session_id: int, user_id: int) -> List[ConversationResponse]:
-    conn = None
-    try:
-        # 获取数据库连接
-        conn = get_db_connection()
-        with conn.cursor() as cur:
-            # 验证会话是否属于该用户
-            cur.execute(
-                "SELECT session_id FROM sessions WHERE session_id = %s AND user_id = %s",
-                (session_id, user_id)
-            )
-            if not cur.fetchone():
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Session does not belong to the user"
-                )
-            
-            # 查询会话的所有对话
-            query = """
-                SELECT 
-                    c.conversation_id, c.session_id, c.created_at, c.conversation_type, 
-                    c.content, c.version, c.conversation_parent_id, c.conversation_child_version,
-                    c.knowledge_graph, c.dify_func_des, c.knowledge_id, c.dify_id, c.preview_code,
-                    p.prd_version, p.prd_content, p.latest, p.restore_version
-                FROM conversations c
-                LEFT JOIN prd p ON c.conversation_id = p.conversation_id AND p.latest = 1
-                WHERE c.session_id = %s
-                ORDER BY c.created_at ASC;
-            """
-            cur.execute(query, (session_id,))
-            
-            # 获取查询结果
-            results = cur.fetchall()
-            
-            # 转换为响应模型列表
-            conversations = []
-            for row in results:
-                conversations.append(ConversationResponse(
-                    conversation_id=str(row[0]),  # 转换 UUID 为字符串
-                    session_id=row[1],
-                    created_at=row[2],
-                    conversation_type=row[3],
-                    content=row[4],
-                    version=row[5],
-                    conversation_parent_id=row[6],
-                    conversation_para_version=row[7],
-                    knowledge_graph=row[8],
-                    dify_func_des=row[9],
-                    knowledge_id=row[10],
-                    dify_id=row[11],
-                    preview_code=row[12],
-                    prd_version=row[13],
-                    prd_content=row[14],
-                    latest=row[15],
-                    restore_version=row[16]
-                ))
-            
-            return conversations
+# 获取对话服务
+async def get_conversations_service(
+    session_id: int,
+    user_id: int,
+    conversation_id: Optional[str],
+    current_user: UserInDB
+) -> List[ConversationResponse]:
+    # 验证请求中的 user_id 是否与当前登录的用户一致
+    if current_user.user_id != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID",
+        )
 
-    except Exception as e:
-        logger.error(f"Error fetching conversations for session {session_id}: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-    finally:
-        if conn:
-            conn.close()
-
-# 查询对话
-async def get_conversations_service(session_id: int, user_id: int, conversation_id: Optional[str] = None) -> List[ConversationResponse]:
-    logger.info(
-        "User %s is querying conversations for session_id: %s", user_id, session_id
-    )
     conn = None
 
     try:
@@ -303,9 +245,7 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
         with conn.cursor() as cur:
             # 查询 session_id 对应的 user_id
             logger.info("Checking session_id %s for user_id %s", session_id, user_id)
-            cur.execute(
-                "SELECT user_id FROM sessions WHERE session_id = %s", (session_id,)
-            )
+            cur.execute("SELECT user_id FROM sessions WHERE session_id = %s", (session_id,))
             result = cur.fetchone()
 
             # 如果查询不到 session_id，返回空
@@ -316,29 +256,22 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
 
             # 比对 session_id 对应的 user_id 和 请求的 user_id 是否一致
             if session_user_id != user_id:
-                logger.warning(
-                    "Session user_id %s does not match request user_id %s",
-                    session_user_id,
-                    user_id,
-                )
+                logger.warning("Session user_id %s does not match request user_id %s", session_user_id, user_id)
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail="You do not have permission to access this session.",
+                    detail="You do not have permission to access this session."
                 )
-
+    
             # 如果传递了 conversation_id，通过 conversation_child_version 找到链路的起始点
             if conversation_id:
                 while True:
-                    cur.execute(
-                        """
+                    cur.execute("""
                         SELECT conversation_id
                         FROM conversations
                         WHERE conversation_parent_id = %s
                         ORDER BY version DESC
                         LIMIT 1
-                    """,
-                        (conversation_id,),
-                    )
+                    """, (conversation_id,))
                     next_conversation = cur.fetchone()
                     if next_conversation:
                         # 如果找到下一个版本，继续查找
@@ -348,27 +281,20 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
                         break
             else:
                 # 如果没有传递 conversation_id，查询 session_id 下最新的 conversation_id
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT conversation_id
                     FROM conversations
                     WHERE session_id = %s
                     ORDER BY created_at DESC
                     LIMIT 1
-                """,
-                    (session_id,),
-                )
+                """, (session_id,))
                 latest_conversation = cur.fetchone()
                 if latest_conversation:
                     conversation_id = latest_conversation[0]
-                    logger.info(
-                        "Latest conversation_id for session_id %s is %s",
-                        session_id,
-                        conversation_id,
-                    )
+                    logger.info("Latest conversation_id for session_id %s is %s", session_id, conversation_id)
                 else:
                     return []
-
+                
             logger.info("Initial conversation id is %s", conversation_id)
             # 递归查找链路上的所有对话
             conversations = []
@@ -383,16 +309,13 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
                 logger.info("Processing conversation_id %s", current_id)
 
                 # 查询当前对话信息
-                cur.execute(
-                    """
+                cur.execute("""
                     SELECT conversation_id, session_id, created_at, conversation_type, content, version,
                            conversation_parent_id, conversation_child_version, knowledge_graph, dify_func_des,
                            knowledge_id, dify_id, preview_code
                     FROM conversations
                     WHERE conversation_id = %s
-                """,
-                    (current_id,),
-                )
+                """, (current_id,))
                 conversation_data = cur.fetchone()
 
                 if conversation_data:
@@ -400,54 +323,43 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
                     prd_content = None
                     prd_version = None
                     latest = None
-                    restore_version = None
-                    cur.execute(
-                        """ 
+                    restore_version = None                    
+                    cur.execute(""" 
                         SELECT prd_content, prd_version, latest, restore_version
                         FROM prd
                         WHERE session_id = %s AND conversation_id = %s
                         ORDER BY prd_version DESC
                         LIMIT 1
-                    """,
-                        (session_id, current_id),
-                    )
+                    """, (session_id, current_id))
                     prd_result = cur.fetchone()
 
                     if prd_result:
-                        prd_content, prd_version, latest, restore_version = prd_result
-
+                        prd_content, prd_version, latest, restore_version = prd_result     
+                                       
                     # 如果存在父级对话，获取父级的conversation_child_version
                     conversation_para_version = None
                     if conversation_data[6]:  # conversation_parent_id
                         parent_id = conversation_data[6]
-                        cur.execute(
-                            """
+                        cur.execute("""
                             SELECT conversation_child_version
                             FROM conversations
                             WHERE conversation_id = %s
-                        """,
-                            (parent_id,),
-                        )
+                        """, (parent_id,))
                         parent_data = cur.fetchone()
                         if parent_data and parent_data[0]:
                             # 确保父级的conversation_child_version是字典类型
                             if isinstance(parent_data[0], str):
                                 try:
-                                    conversation_para_version = json.loads(
-                                        parent_data[0]
-                                    )
+                                    conversation_para_version = json.loads(parent_data[0])
                                 except json.JSONDecodeError:
-                                    logger.warning(
-                                        "Failed to decode JSON for parent_id %s",
-                                        parent_id,
-                                    )
+                                    logger.warning("Failed to decode JSON for parent_id %s", parent_id)
                                     conversation_para_version = None
                             elif isinstance(parent_data[0], dict):
                                 conversation_para_version = parent_data[0]
 
-                    # 创建 Pydantic 模型
+                    # 使用字典解包来创建 Pydantic 模型
                     conversation = ConversationResponse(
-                        conversation_id=str(conversation_data[0]),  # 转换 UUID 为字符串
+                        conversation_id=conversation_data[0],
                         session_id=conversation_data[1],
                         created_at=conversation_data[2],
                         conversation_type=conversation_data[3],
@@ -460,10 +372,10 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
                         prd_content=prd_content,  # 添加prd_content
                         prd_version=prd_version,  # 添加prd_version
                         latest=latest,  # 返回最新的标记
-                        restore_version=restore_version,  # 返回恢复版本号
+                        restore_version=restore_version,  # 返回恢复版本号                        
                         knowledge_id=conversation_data[10],
                         dify_id=conversation_data[11],
-                        preview_code=conversation_data[12],
+                        preview_code=conversation_data[12]
                     )
                     conversations.append(conversation)
 
@@ -482,97 +394,7 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
 
     finally:
         if conn:
-            conn.close()
-
-# 更新对话
-async def update_conversation_service(conversation_id: uuid.UUID, request: ConversationUpdateRequest, current_user: UserInDB) -> Dict[str, str]:
-    logger.info(
-        "User %s is updating conversation %s for session_id: %s",
-        current_user.user_id,
-        conversation_id,
-        request.session_id,
-    )
-
-    conn = None
-    try:
-        # 获取数据库连接
-        conn = get_db_connection()
-        cur = conn.cursor()
-
-        # 查询是否存在该 conversation_id 和 session_id 对应的对话
-        cur.execute(
-            "SELECT conversation_id, session_id FROM conversations WHERE conversation_id = %s AND session_id = %s",
-            (
-                str(conversation_id),
-                str(request.session_id),
-            ),  # 确保 UUID 转换为字符串传递
-        )
-        conversation_record = cur.fetchone()
-
-        if not conversation_record:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Conversation not found for the given session_id",
-            )
-
-        # 1. 构建更新字段，分别更新每个字段
-        if request.knowledge_graph is not None:
-            cur.execute(
-                """
-                UPDATE conversations
-                SET knowledge_graph = %s
-                WHERE conversation_id = %s
-            """,
-                (request.knowledge_graph, str(conversation_id)),
-            )  # 使用字符串形式的 UUID
-
-        if request.dify_func_des is not None:
-            cur.execute(
-                """
-                UPDATE conversations
-                SET dify_func_des = %s
-                WHERE conversation_id = %s
-            """,
-                (request.dify_func_des, str(conversation_id)),
-            )  # 使用字符串形式的 UUID
-
-        if request.knowledge_id is not None:
-            cur.execute(
-                """
-                UPDATE conversations
-                SET knowledge_id = %s
-                WHERE conversation_id = %s
-            """,
-                (request.knowledge_id, str(conversation_id)),
-            )  # 使用字符串形式的 UUID
-
-        # 2. 更新 prd 表的 prd_content（如果有更新）
-        if request.prd_content is not None:
-            cur.execute(
-                """
-                UPDATE prd
-                SET prd_content = %s
-                WHERE conversation_id = %s
-            """,
-                (request.prd_content, str(conversation_id)),
-            )  # 使用字符串形式的 UUID
-
-        # 提交事务
-        conn.commit()
-
-        return {"message": "Conversation and prd content updated successfully"}
-
-    except HTTPException as e:
-        # 捕获并抛出 HTTP 异常
-        raise e
-
-    except Exception as e:
-        logger.error(f"Error updating conversation: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-    finally:
-        if conn:
-            conn.close()
+            db_pool.putconn(conn)  # 将连接放回连接池
 
 # 获取PRD
 async def get_prd_service(user_id: int) -> PrdResponse:
