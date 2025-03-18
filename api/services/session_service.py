@@ -161,11 +161,13 @@ async def delete_session_service(session_id: int, user_id: int):
             result = cur.fetchone()
 
             if not result:
-                return []
+                logger.error(f"Session {session_id} not found.")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
             # 确认 session 属于请求的 user_id
             session_user_id = result[0]
             if session_user_id != user_id:
+                logger.error(f"User {user_id} does not have permission to delete session {session_id}.")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="You do not have permission to delete this session."
