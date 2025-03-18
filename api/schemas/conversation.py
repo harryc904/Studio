@@ -41,6 +41,15 @@ class ConversationResponse(BaseModel):
     latest: Optional[int]  # PRD是否为最新版本
     restore_version: Optional[int]  # 恢复的版本号
 
+class ConversationUpdateRequest(BaseModel):
+    user_id: int  # 用户 ID，用于验证当前登录用户
+    session_id: int  # 会话 ID，用于验证该会话是否存在
+    knowledge_graph: Optional[str] = None  # 可选字段：knowledge_graph
+    dify_func_des: Optional[str] = None  # 可选字段：dify_func_des
+    prd_content: Optional[str] = None   # 可选字段：prd_content
+    prd_version: Optional[int] = None
+    knowledge_id: Optional[str] = None      # 可选字段：knowledge_id
+
 # PRD响应模型
 class PrdResponse(BaseModel):
     prd_content: str  # 返回的 prd_content 字段
