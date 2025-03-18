@@ -5,7 +5,7 @@ from typing import List
 from api.schemas.session import SessionCreateRequest, SessionResponse, UpdateSessionNameRequest
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
-from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service，delete_session_service
+from api.services.session_service import create_session_service, get_user_sessions_service, update_session_name_service, delete_session_service
 from api.utils.logger import get_logger
 
 logger = get_logger(__name__)
