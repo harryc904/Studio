@@ -201,7 +201,7 @@ async def create_conversation_service(request: ConversationCreateRequest, curren
                 content=result[4],
                 version=result[5],
                 conversation_parent_id=result[6],
-                conversation_para_version=conversation_child_version,  # 返回更新后的父级子版本信息
+                conversation_para_version=json.loads(conversation_child_version) if conversation_child_version else None,  # 将字符串转换为字典
                 knowledge_graph=result[8],
                 dify_func_des=result[9],
                 knowledge_id=result[10],
@@ -262,7 +262,7 @@ async def get_session_conversations_service(session_id: int, user_id: int) -> Li
             conversations = []
             for row in results:
                 conversations.append(ConversationResponse(
-                    conversation_id=row[0],
+                    conversation_id=str(row[0]),  # 转换 UUID 为字符串
                     session_id=row[1],
                     created_at=row[2],
                     conversation_type=row[3],
@@ -447,7 +447,7 @@ async def get_conversations_service(session_id: int, user_id: int, conversation_
 
                     # 创建 Pydantic 模型
                     conversation = ConversationResponse(
-                        conversation_id=conversation_data[0],
+                        conversation_id=str(conversation_data[0]),  # 转换 UUID 为字符串
                         session_id=conversation_data[1],
                         created_at=conversation_data[2],
                         conversation_type=conversation_data[3],
