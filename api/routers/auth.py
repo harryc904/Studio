@@ -5,18 +5,16 @@ from jose import JWTError, jwt
 from typing import Optional, Union
 from pydantic import EmailStr
 
-from api.schemas.auth import Token, TokenData, UserRegisterRequest, UserRegisterResponse, LoginRequestForm
+from api.schemas.auth import Token, UserRegisterRequest, UserRegisterResponse, LoginRequestForm
 from api.schemas.user import User, UserInDB
 from api.services.auth_service import (
     authenticate_user,
     create_access_token,
     get_current_user,
-    get_password_hash,
     get_user_by_phone,
-    get_user_from_db,
     register_user_service
 )
-from api.utils.sms import get_verification_code, send_verification_code, store_verification_code
+from api.utils.sms import get_verification_code, send_verification_code
 from api.config import JWT_ACCESS_TOKEN_EXPIRE_MINUTES
 from api.utils.logger import get_logger
 

@@ -4,9 +4,9 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 
-from api.schemas.user import User, UserInDB
+from api.schemas.user import UserInDB
 from api.schemas.auth import TokenData, UserRegisterRequest
-from api.utils.security import verify_password, get_password_hash, create_access_token
+from api.utils.security import verify_password, get_password_hash
 from api.utils.db import get_db_connection
 from api.config import JWT_SECRET_KEY, JWT_ALGORITHM
 from api.utils.logger import get_logger

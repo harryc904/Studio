@@ -5,7 +5,7 @@ import uuid
 import json
 
 from api.utils.db import get_db_connection
-from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
+from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, PrdResponse
 from api.schemas.user import UserInDB
 from api.utils.logger import get_logger
 
