@@ -208,5 +208,3 @@ async def delete_session_service(session_id: int, user_id: int):
     finally:
         if cur:
             cur.close()  # 关闭游标
-        if conn:
-            db_pool.putconn(conn)  # 将连接放回连接池
