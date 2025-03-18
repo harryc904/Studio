@@ -194,7 +194,7 @@ async def create_conversation_service(request: ConversationCreateRequest, curren
         if result:
             # 构建响应对象
             return ConversationResponse(
-                conversation_id=result[0],
+                conversation_id=str(result[0]),  # 转换 UUID 为字符串
                 session_id=result[1],
                 created_at=result[2],
                 conversation_type=result[3],
