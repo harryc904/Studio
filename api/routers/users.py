@@ -34,7 +34,7 @@ async def get_user(user_id: int, current_user: UserInDB = Depends(get_current_us
         logger.error(f"Error fetching user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
-@router.put("/users/update_password", response_model=UpdatePasswordResponse)
+@router.put("/update_password", response_model=UpdatePasswordResponse)
 async def update_password(
     request: UpdatePasswordRequest,
     current_user: UserInDB = Depends(get_current_user)
