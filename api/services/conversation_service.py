@@ -352,7 +352,7 @@ async def get_conversations_service(
 
                     # 使用字典解包来创建 Pydantic 模型
                     conversation = ConversationResponse(
-                        conversation_id=conversation_data[0],
+                        conversation_id=str(conversation_data[0]),  # 转换 UUID 为字符串
                         session_id=conversation_data[1],
                         created_at=conversation_data[2],
                         conversation_type=conversation_data[3],
