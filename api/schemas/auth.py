@@ -37,3 +37,7 @@ class LoginRequestForm(BaseModel):
 # 更新密码请求模型
 class UpdatePasswordRequest(BaseModel):
     new_password: str
+
+# 更新密码响应模型
+class UpdatePasswordResponse(BaseModel):
+    message: str

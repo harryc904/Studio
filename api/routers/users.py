@@ -3,8 +3,9 @@ from typing import List
 
 from api.schemas.user import User, UserInDB
 from api.services.auth_service import get_current_user
-from api.services.user_service import get_user_by_id_service
+from api.services.user_service import get_user_by_id_service, update_password_service
 from api.utils.logger import get_logger
+from api.schemas.auth import UpdatePasswordRequest, UpdatePasswordResponse
 
 logger = get_logger(__name__)
 
@@ -32,3 +33,10 @@ async def get_user(user_id: int, current_user: UserInDB = Depends(get_current_us
     except Exception as e:
         logger.error(f"Error fetching user {user_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.put("/users/update_password", response_model=UpdatePasswordResponse)
+async def update_password(
+    request: UpdatePasswordRequest,
+    current_user: UserInDB = Depends(get_current_user)
+):
+    return await update_password_service(request, current_user)

@@ -3,10 +3,11 @@ from typing import Optional
 
 from api.utils.db import get_db_connection
 from api.schemas.user import User
+from api.schemas.auth import UpdatePasswordRequest, UpdatePasswordResponse
 from api.utils.logger import get_logger
+from api.utils.security import get_password_hash
 
 logger = get_logger(__name__)
-
 
 # 根据用户ID获取用户信息
 async def get_user_by_id_service(user_id: int) -> Optional[User]:
@@ -86,3 +87,37 @@ async def update_user_service(user_id: int, update_data: dict) -> User:
     finally:
         if conn:
             conn.close()
+
+async def update_password_service(request: UpdatePasswordRequest, current_user):
+    new_password = request.new_password
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # 将新密码进行哈希处理
+        hashed_password = get_password_hash(new_password)
+
+        # 更新数据库中的密码字段
+        update_query = """
+        UPDATE users
+        SET password = %s
+        WHERE user_id = %s
+        """
+        cur.execute(update_query, (hashed_password, current_user.user_id))
+
+        # 提交事务
+        conn.commit()
+
+        # 返回成功消息
+        logger.info(f"Password updated successfully for user {current_user.user_id}")
+        return UpdatePasswordResponse(message="Password updated successfully")
+
+    except Exception as e:
+        logger.error(f"Error updating password for user {current_user.user_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    finally:
+        if conn:
+            conn.close()  # 将连接关闭
