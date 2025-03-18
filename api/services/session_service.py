@@ -152,50 +152,49 @@ async def delete_session_service(session_id: int, user_id: int):
     try:
         # 获取数据库连接
         conn = get_db_connection()
-        cur = conn.cursor()
+        with conn.cursor() as cur:
+            # 首先检查 session 是否存在，并且属于当前用户
+            session_check_query = """
+            SELECT user_id FROM sessions WHERE session_id = %s
+            """
+            cur.execute(session_check_query, (session_id,))
+            result = cur.fetchone()
 
-        # 首先检查 session 是否存在，并且属于当前用户
-        session_check_query = """
-        SELECT user_id FROM sessions WHERE session_id = %s
-        """
-        cur.execute(session_check_query, (session_id,))
-        result = cur.fetchone()
+            if not result:
+                return []
 
-        if not result:
-            return []
+            # 确认 session 属于请求的 user_id
+            session_user_id = result[0]
+            if session_user_id != user_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You do not have permission to delete this session."
+                )
 
-        # 确认 session 属于请求的 user_id
-        session_user_id = result[0]
-        if session_user_id != user_id:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to delete this session."
-            )
+            # 删除 prd 表中与 session_id 相关的记录
+            delete_prd_query = """
+            DELETE FROM prd WHERE session_id = %s
+            """
+            cur.execute(delete_prd_query, (session_id,))
 
-        # 删除 prd 表中与 session_id 相关的记录
-        delete_prd_query = """
-        DELETE FROM prd WHERE session_id = %s
-        """
-        cur.execute(delete_prd_query, (session_id,))
+            # 开始删除操作，删除 conversations 表中对应的记录
+            delete_conversations_query = """
+            DELETE FROM conversations WHERE session_id = %s
+            """
+            cur.execute(delete_conversations_query, (session_id,))
 
-        # 开始删除操作，删除 conversations 表中对应的记录
-        delete_conversations_query = """
-        DELETE FROM conversations WHERE session_id = %s
-        """
-        cur.execute(delete_conversations_query, (session_id,))
+            # 删除 sessions 表中对应的记录
+            delete_session_query = """
+            DELETE FROM sessions WHERE session_id = %s
+            """
+            cur.execute(delete_session_query, (session_id,))
 
-        # 删除 sessions 表中对应的记录
-        delete_session_query = """
-        DELETE FROM sessions WHERE session_id = %s
-        """
-        cur.execute(delete_session_query, (session_id,))
+            # 提交事务
+            conn.commit()
 
-        # 提交事务
-        conn.commit()
-
-        # 返回删除成功的消息
-        logger.info(f"Session {session_id} and its conversations, prd records deleted for user {user_id}")
-        return {"message": "Session and its conversations, prd records deleted successfully"}
+            # 返回删除成功的消息
+            logger.info(f"Session {session_id} and its conversations, prd records deleted for user {user_id}")
+            return {"message": "Session and its conversations, prd records deleted successfully"}
 
     except HTTPException as http_exc:
         # 捕获并抛出自定义的 HTTP 错误
@@ -206,5 +205,5 @@ async def delete_session_service(session_id: int, user_id: int):
         raise HTTPException(status_code=500, detail="Internal server error")
 
     finally:
-        if cur:
-            cur.close()  # 关闭游标
+        if conn:
+            conn.close()  # 关闭连接
