@@ -35,7 +35,7 @@ async def create_conversation(request: ConversationCreateRequest, current_user: 
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # 查询对话接口
-@router.get("/{session_id}", response_model=List[ConversationResponse])
+@router.get("/sessions/{session_id}", response_model=List[ConversationResponse])
 async def get_conversations(
     session_id: int,
     user_id: int,
