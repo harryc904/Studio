@@ -89,6 +89,6 @@ async def update_conversation(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 # 获取 PRD 接口 (是后端直接用的，不需要验证用户，是否需要包装成API接口）
-@router.get("/get_prd", response_model=PrdResponse)
+@router.get("/prd", response_model=PrdResponse)
 async def get_prd(user_id: int):
     return await get_prd_service(user_id)
