@@ -5,7 +5,7 @@ import uuid
 import json
 
 from api.utils.db import get_db_connection
-from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, PrdResponse
+from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, PrdResponse, ConversationUpdateRequest
 from api.schemas.user import UserInDB
 from api.utils.logger import get_logger
 
@@ -450,3 +450,69 @@ async def get_prd_service(user_id: int) -> PrdResponse:
     finally:
         if conn:
             conn.close()
+
+# 更新对话内容服务
+async def update_conversation_service(conversation_id: uuid.UUID, request: ConversationUpdateRequest):
+    conn = None
+    try:
+        # 获取数据库连接
+        conn = get_db_connection()
+        cur = conn.cursor()
+
+        # 查询是否存在该 conversation_id 和 session_id 对应的对话
+        cur.execute(
+            "SELECT conversation_id, session_id FROM conversations WHERE conversation_id = %s AND session_id = %s",
+            (str(conversation_id), str(request.session_id))  # 确保 UUID 转换为字符串传递
+        )
+        conversation_record = cur.fetchone()
+
+        if not conversation_record:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found for the given session_id"
+            )
+
+        # 1. 构建更新字段，分别更新每个字段
+        if request.knowledge_graph is not None:
+            cur.execute("""
+                UPDATE conversations
+                SET knowledge_graph = %s
+                WHERE conversation_id = %s
+            """, (request.knowledge_graph, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        if request.dify_func_des is not None:
+            cur.execute("""
+                UPDATE conversations
+                SET dify_func_des = %s
+                WHERE conversation_id = %s
+            """, (request.dify_func_des, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        if request.knowledge_id is not None:
+            cur.execute("""
+                UPDATE conversations
+                SET knowledge_id = %s
+                WHERE conversation_id = %s
+            """, (request.knowledge_id, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        # 2. 更新 prd 表的 prd_content（如果有更新）
+        if request.prd_content is not None:
+            cur.execute("""
+                UPDATE prd
+                SET prd_content = %s
+                WHERE conversation_id = %s
+            """, (request.prd_content, str(conversation_id)))  # 使用字符串形式的 UUID
+
+        # 提交事务
+        conn.commit()
+
+    except HTTPException as e:
+        # 捕获并抛出 HTTP 异常
+        raise e
+
+    except Exception as e:
+        logger.error(f"Error updating conversation: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+    finally:
+        if conn:
+            conn.close()  # 关闭数据库连接

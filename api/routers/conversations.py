@@ -3,10 +3,10 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 
-from api.schemas.conversation import ConversationCreateRequest, ConversationResponse
+from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
-from api.services.conversation_service import create_conversation_service, get_conversations_service
+from api.services.conversation_service import create_conversation_service, get_conversations_service, update_conversation_service
 from api.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -57,4 +57,33 @@ async def get_conversations(
         return conversations
     except Exception as e:
         logger.error(f"Error querying conversations: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# 更新会话内容接口
+@router.put("/{conversation_id}")
+async def update_conversation(
+    conversation_id: uuid.UUID,  # 通过 URL 参数传递 conversation_id
+    request: ConversationUpdateRequest,  # 请求体使用新的结构体
+    current_user: UserInDB = Depends(get_current_user)  # 当前登录的用户
+):
+    logger.info("User %s is updating conversation %s for session_id: %s", current_user.user_id, conversation_id, request.session_id)
+
+    # 验证请求中的 user_id 是否与当前登录的用户一致
+    if current_user.user_id != request.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User ID does not match the authenticated user's ID",
+        )
+
+    try:
+        # 调用服务层更新对话
+        await update_conversation_service(conversation_id, request)
+        return {"message": "Conversation and prd content updated successfully"}
+
+    except HTTPException as e:
+        # 捕获并抛出 HTTP 异常
+        raise e
+
+    except Exception as e:
+        logger.error(f"Error updating conversation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
