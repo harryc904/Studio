@@ -3,10 +3,10 @@ from typing import List, Optional
 from datetime import datetime
 import uuid
 
-from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest
+from api.schemas.conversation import ConversationCreateRequest, ConversationResponse, ConversationUpdateRequest, PrdResponse
 from api.schemas.user import UserInDB
 from api.services.auth_service import get_current_user
-from api.services.conversation_service import create_conversation_service, get_conversations_service, update_conversation_service
+from api.services.conversation_service import create_conversation_service, get_conversations_service, update_conversation_service, get_prd_service
 from api.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -87,3 +87,8 @@ async def update_conversation(
     except Exception as e:
         logger.error(f"Error updating conversation: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+# 获取 PRD 接口 (是后端直接用的，不需要验证用户，是否需要包装成API接口）
+@router.get("/get_prd", response_model=PrdResponse)
+async def get_prd(user_id: int):
+    return await get_prd_service(user_id)
