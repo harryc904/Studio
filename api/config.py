@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # 加载环境变量
 load_dotenv()
 
-# 数据库配置
+# 主数据库配置
 DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
@@ -14,8 +14,20 @@ DB_PORT = os.getenv("DB_PORT")
 DB_MIN_CONNECTIONS = int(os.getenv("DB_MIN_CONNECTIONS", 1))
 DB_MAX_CONNECTIONS = int(os.getenv("DB_MAX_CONNECTIONS", 10))
 
-# 数据库连接字符串
+# 主数据库连接字符串
 DB_CONNECTION_STRING = f"dbname={DB_NAME} user={DB_USER} password={DB_PASSWORD} host={DB_HOST} port={DB_PORT}"
+
+# 业务数据库配置
+B_DB_NAME = os.getenv("B_DB_NAME")
+B_DB_USER = os.getenv("B_DB_USER")
+B_DB_PASSWORD = os.getenv("B_DB_PASSWORD")
+B_DB_HOST = os.getenv("B_DB_HOST")
+B_DB_PORT = os.getenv("B_DB_PORT")
+B_DB_MIN_CONNECTIONS = int(os.getenv("B_DB_MIN_CONNECTIONS", 1))
+B_DB_MAX_CONNECTIONS = int(os.getenv("B_DB_MAX_CONNECTIONS", 10))
+
+# 业务数据库连接字符串
+B_DB_CONNECTION_STRING = f"dbname={B_DB_NAME} user={B_DB_USER} password={B_DB_PASSWORD} host={B_DB_HOST} port={B_DB_PORT}"
 
 # JWT 配置
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
