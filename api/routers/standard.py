@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException
-from api.schemas.standard import Standard
-from api.services.standard_service import is_standard_id_exists, insert_standard_data
+from fastapi import APIRouter, Query, HTTPException
+from typing import List
+from api.schemas.standard import Standard, StandardResponse
+from api.services.standard_service import is_standard_id_exists, insert_standard_data, get_standards_from_db
 
 router = APIRouter()
 
@@ -20,3 +21,14 @@ async def store_standard(standard: Standard):
         return {"message": "Standard data stored successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/standards", response_model=List[StandardResponse])
+async def get_standards(terms: int = Query(..., ge=0, le=1, description="Set 0 for standards only, 1 for standards with terms")):
+    # Check if terms is either 0 or 1, otherwise raise HTTPException
+    if terms not in [0, 1]:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid value for 'terms'. It must be either 0 or 1."
+        )
+    standards = get_standards_from_db(terms)
+    return standards

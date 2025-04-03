@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 class Note(BaseModel):
     ID: int
@@ -18,3 +18,10 @@ class Standard(BaseModel):
     documentNameEnglish: str
     scope: str
     terms: List[Term]
+
+class StandardResponse(BaseModel):
+    standardID: str
+    documentName: str
+    documentNameEnglish: Optional[str] = None
+    scope: Optional[str] = None  
+    terms: Optional[List[Term]] = None

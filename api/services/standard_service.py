@@ -4,6 +4,9 @@ from psycopg2.extras import execute_values
 from api.schemas.standard import Standard
 from fastapi import HTTPException
 from api.utils.db import get_b_db_connection
+from typing import List
+from psycopg2.extras import RealDictCursor
+from api.schemas.standard import StandardResponse
 
 # 检查 standard_id 是否已存在
 def is_standard_id_exists(sanitized_standard_id: str) -> bool:
