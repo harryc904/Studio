@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
 class UserStory(BaseModel):
     id: str
@@ -10,3 +10,6 @@ class UseCase(BaseModel):
     name: str
     description: str
     userstories: List[UserStory]
+
+class PRDData(BaseModel):
+    chapters: List[Dict]

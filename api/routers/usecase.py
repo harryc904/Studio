@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List
-from api.schemas.usecase import UseCase
-from api.services.usecase_service import get_all_ucus, get_details, get_us_table_service
+from api.schemas.usecase import UseCase, PRDData
+from api.services.usecase_service import get_all_ucus, get_details, get_us_table_service, process_prd_data_service
 
 router = APIRouter()
 
@@ -19,3 +19,10 @@ async def get_us_table_endpoint(conn=Depends(get_us_table_service)):
         return conn
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+@router.post("/achieve_data")
+async def achieve_data_endpoint(data: PRDData):
+    try:
+        return await process_prd_data_service(data)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
