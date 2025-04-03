@@ -4,6 +4,7 @@ from fastapi import HTTPException
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from api.config import DATABASE_CONFIG
+from api.dependencies import get_db_connection
 
 def get_all_ucus():
     try:
@@ -200,6 +201,46 @@ async def get_details(id: str, uuid: str):
     except Exception as e:
         # 捕获所有其他类型的异常，返回 500 错误
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
+    finally:
+        cur.close()
+        conn.close()
+
+async def get_us_table_service():
+    conn = get_db_connection()
+    cur = conn.cursor(cursor_factory=RealDictCursor)
+
+    try:
+        cur.execute("""
+            SELECT 
+                us.us_id, 
+                us.description, 
+                s.status_name, 
+                uj.name AS user_journey_name, 
+                us.valid_vehicle, 
+                us.uuid
+            FROM userstory us
+            LEFT JOIN status s ON us.status_id = s.status_id
+            LEFT JOIN userjourney uj ON us.user_journey_id = uj.user_journey_id
+        """)
+        userstories = cur.fetchall()
+
+        result = [
+            {
+                "us_id": f"US-{str(us['us_id']).zfill(6)}",
+                "description": us["description"],
+                "status_name": us["status_name"],
+                "user_journey_name": us["user_journey_name"],
+                "valid_vehicle": us["valid_vehicle"],
+                "uuid": us["uuid"]
+            }
+            for us in userstories
+        ]
+
+        return result
+
+    except Exception as e:
+        raise e
 
     finally:
         cur.close()
