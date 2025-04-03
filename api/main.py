@@ -12,7 +12,7 @@ from api.config import (
 )
 
 # 导入路由模块
-from api.routers import auth, conversations, sessions, users, standard, usecase
+from api.routers import auth, conversations, sessions, users, standard, usecase, uur_graph
 
 # 导入日志模块
 logger = get_logger(__name__)
@@ -35,6 +35,7 @@ app.include_router(conversations.router)
 app.include_router(users.router)
 app.include_router(standard.router)
 app.include_router(usecase.router)
+app.include_router(uur_graph.router)
 
 # 添加中间件来记录请求和响应
 @app.middleware("http")
