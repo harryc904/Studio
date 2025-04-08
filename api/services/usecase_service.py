@@ -1,8 +1,6 @@
 from api.schemas.usecase import UseCase, UserStory
 from api.utils.db import get_b_db_connection
 from fastapi import HTTPException
-import psycopg2
-from psycopg2.extras import RealDictCursor
 from api.schemas.usecase import PRDData
 import logging
 
@@ -71,7 +69,7 @@ def get_all_ucus():
 
 async def get_details(id: str, uuid: str):
     conn = get_b_db_connection()  # 使用 get_b_db_connection
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()  # 使用默认 cursor
 
     try:
         # 判断查询的是哪个表，通过id前缀判断
@@ -94,21 +92,21 @@ async def get_details(id: str, uuid: str):
 
             # 返回查询到的数据
             return {
-                "uc_id": f"UC-{str(data['uc_id']).zfill(6)}",
-                "name": data['name'],
-                "description": data['description'],
-                "system": data['system'],
-                "primary_actor": data['primary_actor'],
-                "secondary_actor": data['secondary_actor'],
-                "precondition": data['precondition'],
-                "success_end_condition": data['success_end_condition'],
-                "failed_end_condition": data['failed_end_condition'],
-                "uc_appendix_id": data['uc_appendix_id'],
-                "uuid": data['uuid'],
-                "created_time": data['created_time'],
-                "created_by": data['created_by'],
-                "modified_time": data['modified_time'],
-                "modified_by": data['modified_by']
+                "uc_id": f"UC-{str(data[0]).zfill(6)}",
+                "name": data[1],
+                "description": data[2],
+                "system": data[3],
+                "primary_actor": data[4],
+                "secondary_actor": data[5],
+                "precondition": data[6],
+                "success_end_condition": data[7],
+                "failed_end_condition": data[8],
+                "uc_appendix_id": data[9],
+                "uuid": data[10],
+                "created_time": data[11],
+                "created_by": data[12],
+                "modified_time": data[13],
+                "modified_by": data[14]
             }
 
         elif id.startswith("US-"):
@@ -127,32 +125,32 @@ async def get_details(id: str, uuid: str):
                 raise HTTPException(status_code=404, detail="Userstory not found")
 
             # 查询 status 表，获取 status_name
-            cur.execute("SELECT status_name FROM status WHERE status_id = %s", (data['status_id'],))
+            cur.execute("SELECT status_name FROM status WHERE status_id = %s", (data[3],))
             status = cur.fetchone()
-            status_name = status['status_name'] if status else None
+            status_name = status[0] if status else None
 
             # 查询 userjourney 表，获取 user_journey_name
-            cur.execute("SELECT name AS user_journey_name FROM userjourney WHERE user_journey_id = %s", (data['user_journey_id'],))
+            cur.execute("SELECT name AS user_journey_name FROM userjourney WHERE user_journey_id = %s", (data[4],))
             user_journey = cur.fetchone()
-            user_journey_name = user_journey['user_journey_name'] if user_journey else None
+            user_journey_name = user_journey[0] if user_journey else None
 
             # 返回查询到的数据
             return {
-                "us_id": f"US-{str(data['us_id']).zfill(6)}", 
-                "description": data['description'],
-                "uc_id": f"UC-{str(data['uc_id']).zfill(6)}" if data['uc_id'] else None, 
-                "status_id": data['status_id'],
+                "us_id": f"US-{str(data[0]).zfill(6)}", 
+                "description": data[1],
+                "uc_id": f"UC-{str(data[2]).zfill(6)}" if data[2] else None, 
+                "status_id": data[3],
                 "status_name": status_name,
-                "user_journey_id": data['user_journey_id'],
+                "user_journey_id": data[4],
                 "user_journey_name": user_journey_name,
-                "acceptance_criteria": data['acceptance_criteria'],
-                "valid_vehicle": data['valid_vehicle'],
-                "uuid": data['uuid'],
-                "uuid_uc": data['uuid_uc'],
-                "created_time": data['created_time'],
-                "created_by": data['created_by'],
-                "modified_time": data['modified_time'],
-                "modified_by": data['modified_by']
+                "acceptance_criteria": data[5],
+                "valid_vehicle": data[6],
+                "uuid": data[7],
+                "uuid_uc": data[8],
+                "created_time": data[9],
+                "created_by": data[10],
+                "modified_time": data[11],
+                "modified_by": data[12]
             }
 
         elif id.startswith("REQ-"):
@@ -171,27 +169,27 @@ async def get_details(id: str, uuid: str):
                 raise HTTPException(status_code=404, detail="Requirement not found")
 
             # 查询 req_uc_relations 表，获取 uc_id
-            cur.execute("SELECT uc_id FROM req_uc_relations WHERE requirement_id = %s", (data['requirement_id'],))
+            cur.execute("SELECT uc_id FROM req_uc_relations WHERE requirement_id = %s", (data[0],))
             uc_relation = cur.fetchone()
-            uc_id = uc_relation['uc_id'] if uc_relation else None
+            uc_id = uc_relation[0] if uc_relation else None
 
             # 返回查询到的数据
             return {
-                "requirement_id": f"REQ-{str(data['requirement_id']).zfill(6)}",
-                "name": data['name'],
-                "description": data['description'],
-                "requirement_type": data['requirement_type'],
-                "ASIL": data['asil'],
+                "requirement_id": f"REQ-{str(data[0]).zfill(6)}",
+                "name": data[1],
+                "description": data[2],
+                "requirement_type": data[3],
+                "ASIL": data[4],
                 "uc_id": f"UC-{str(uc_id).zfill(6)}" if uc_id else None,
-                "standard_id": data['standard_id'],
-                "source": data['source'],
-                "purpose": data['purpose'],
-                "verification_method": data['verification_method'],
-                "uuid": data['uuid'],
-                "created_time": data['created_time'],
-                "created_by": data['created_by'],
-                "modified_time": data['modified_time'],
-                "modified_by": data['modified_by']
+                "standard_id": data[5],
+                "source": data[6],
+                "purpose": data[7],
+                "verification_method": data[8],
+                "uuid": data[9],
+                "created_time": data[10],
+                "created_by": data[11],
+                "modified_time": data[12],
+                "modified_by": data[13]
             }
 
         else:
@@ -210,7 +208,7 @@ async def get_details(id: str, uuid: str):
 
 async def get_us_table_service():
     conn = get_b_db_connection()
-    cur = conn.cursor(cursor_factory=RealDictCursor)
+    cur = conn.cursor()
 
     try:
         cur.execute("""
@@ -229,12 +227,12 @@ async def get_us_table_service():
 
         result = [
             {
-                "us_id": f"US-{str(us['us_id']).zfill(6)}",
-                "description": us["description"],
-                "status_name": us["status_name"],
-                "user_journey_name": us["user_journey_name"],
-                "valid_vehicle": us["valid_vehicle"],
-                "uuid": us["uuid"]
+                "us_id": f"US-{str(us[0]).zfill(6)}",
+                "description": us[1],
+                "status_name": us[2],
+                "user_journey_name": us[3],
+                "valid_vehicle": us[4],
+                "uuid": us[5]
             }
             for us in userstories
         ]
@@ -252,48 +250,48 @@ def get_or_create_user_journey(cur, name: str):
     query = "SELECT user_journey_id FROM userjourney WHERE name = %s"
     cur.execute(query, (name,))
     result = cur.fetchone()
-    if result:
-        return result["user_journey_id"]
+    if (result):
+        return result[0]
     else:
         query = "INSERT INTO userjourney (name) VALUES (%s) RETURNING user_journey_id"
         cur.execute(query, (name,))
-        return cur.fetchone()["user_journey_id"]
+        return cur.fetchone()[0]
 
 # 校验并获取或创建 status_id
 def get_or_create_status(cur, status_name: str):
     query = "SELECT status_id FROM status WHERE status_name = %s"
     cur.execute(query, (status_name,))
     result = cur.fetchone()
-    if result:
-        return result["status_id"]
+    if (result):
+        return result[0]
     else:
         query = "INSERT INTO status (status_name) VALUES (%s) RETURNING status_id"
         cur.execute(query, (status_name,))
-        return cur.fetchone()["status_id"]
+        return cur.fetchone()[0]
 
 # 校验并获取或创建 stakeholder_id
 def get_or_create_stakeholder(cur, name: str):
     query = "SELECT stakeholder_id FROM stakeholder WHERE name = %s"
     cur.execute(query, (name,))
     result = cur.fetchone()
-    if result:
-        return result["stakeholder_id"]
+    if (result):
+        return result[0]
     else:
         query = "INSERT INTO stakeholder (name) VALUES (%s) RETURNING stakeholder_id"
         cur.execute(query, (name,))
-        return cur.fetchone()["stakeholder_id"]
+        return cur.fetchone()[0]
 
 # 校验并获取或创建 interest_id
 def get_or_create_interest(cur, description: str):
     query = "SELECT interest_id FROM interest WHERE description = %s"
     cur.execute(query, (description,))
     result = cur.fetchone()
-    if result:
-        return result["interest_id"]
+    if (result):
+        return result[0]
     else:
         query = "INSERT INTO interest (description) VALUES (%s) RETURNING interest_id"
         cur.execute(query, (description,))
-        return cur.fetchone()["interest_id"]
+        return cur.fetchone()[0]
 
 def get_or_create_standard(cur, standard_id: str, document_name: str):
     # 检查是否已存在
@@ -302,12 +300,12 @@ def get_or_create_standard(cur, standard_id: str, document_name: str):
     result = cur.fetchone()
     
     if result:
-        return result["id"]
+        return result[0]
     else:
         # 插入新记录
         query = "INSERT INTO standards (standard_id, document_name) VALUES (%s, %s) RETURNING id"
         cur.execute(query, (standard_id, document_name))
-        return cur.fetchone()["id"]
+        return cur.fetchone()[0]
 
 async def process_prd_data_service(data: PRDData):
     conn = get_b_db_connection()
@@ -344,7 +342,7 @@ async def process_prd_data_service(data: PRDData):
         VALUES (%s) RETURNING id
         """
         cur.execute(query, (appendix_table_txt,))
-        uc_appendix_id = cur.fetchone()["id"]
+        uc_appendix_id = cur.fetchone()[0]
         logger.debug(f"Step 3 - uc_appendix ID: {uc_appendix_id}")
 
         # Step 4: Process UseCase related data
@@ -372,8 +370,8 @@ async def process_prd_data_service(data: PRDData):
             secondary_actors, preconditions, success_end_conditions, fail_protection_conditions, uc_appendix_id, main_success_scenario_str, extensions_str, io_variations_str
         ))
         use_case = cur.fetchone()
-        use_case_id = use_case["uc_id"]
-        use_case_uuid = use_case["uuid"]
+        use_case_id = use_case[0]
+        use_case_uuid = use_case[1]
         logger.debug(f"Step 4 - Use Case ID: {use_case_id}; Use Case UUID: {use_case_uuid}")
 
         # Step 5: 提取 regulations 字段
@@ -425,7 +423,7 @@ async def process_prd_data_service(data: PRDData):
         VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING us_id
         """
         cur.execute(query, (use_case_id, use_case_uuid, user_story_description, valid_vehicles, acceptance_criteria, status_id, user_journey_id))
-        user_story_id = cur.fetchone()["us_id"]
+        user_story_id = cur.fetchone()[0]
         logger.debug(f"Step 6 - User Story ID: {user_story_id}")
 
         # Step 7: Process Stakeholders and Interests
@@ -462,7 +460,7 @@ async def process_prd_data_service(data: PRDData):
             VALUES (%s, %s, %s, %s, %s) RETURNING requirement_id
             """
             cur.execute(query, (requirement_name, description, requirement_type, asil, source))
-            requirement_id = cur.fetchone()["requirement_id"]
+            requirement_id = cur.fetchone()[0]
 
             query = """
             INSERT INTO req_uc_relations (requirement_id, uc_id)

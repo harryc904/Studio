@@ -1,11 +1,7 @@
-import psycopg2
 import json
-from psycopg2.extras import execute_values
 from api.schemas.standard import Standard
 from fastapi import HTTPException
 from api.utils.db import get_b_db_connection
-from typing import List
-from psycopg2.extras import RealDictCursor
 from api.schemas.standard import StandardResponse
 
 # 检查 standard_id 是否已存在
@@ -62,15 +58,18 @@ def insert_standard_data(standard: Standard):
             for term in standard.terms
         ]
 
-        execute_values(
-            cursor,
-            """
-            INSERT INTO terms (standard_id, term_id, term, term_english, definition, notes)
-            VALUES %s
-            """,
-            term_values,
-            template="(%s, %s, %s, %s, %s, %s::jsonb)"  # 确保使用 JSONB 类型
+        # 手动构建批量插入的 SQL 语句
+        term_insert_query = """
+        INSERT INTO terms (standard_id, term_id, term, term_english, definition, notes)
+        VALUES {}
+        """.format(
+            ", ".join(
+                cursor.mogrify("(%s, %s, %s, %s, %s, %s::jsonb)", term).decode("utf-8")
+                for term in term_values
+            )
         )
+
+        cursor.execute(term_insert_query)
 
         conn.commit()
     except Exception as e:
