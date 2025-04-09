@@ -2,6 +2,7 @@ import json
 from api.schemas.standard import Standard
 from fastapi import HTTPException
 from api.utils.db import get_b_db_connection
+from psycopg.rows import dict_row
 
 # 检查 standard_id 是否已存在
 def is_standard_id_exists(sanitized_standard_id: str) -> bool:
@@ -68,7 +69,7 @@ def insert_standard_data(standard: Standard):
 
         # 提交事务
         conn.commit()
-        
+
     except Exception as e:
         conn.rollback()
         raise e
@@ -80,8 +81,8 @@ def insert_standard_data(standard: Standard):
 def get_standards_from_db(terms: int):
     try:
         conn = get_b_db_connection()
-        cursor = conn.cursor()
-        
+        cursor = conn.cursor(row_factory=dict_row)  # 设置 row_factory 为 dict_row
+       
         # Base query to get standards
         query = """
             SELECT standard_id, document_name, document_name_english, scope
@@ -103,8 +104,8 @@ def get_standards_from_db(terms: int):
         standards = {}
 
         for row in rows:
-            standard_id = row['standard_id']
-            
+            standard_id = row['standard_id']  # 现在可以通过键访问
+
             if standard_id not in standards:
                 standards[standard_id] = {
                     "standardID": row['standard_id'],
@@ -113,27 +114,24 @@ def get_standards_from_db(terms: int):
                     "scope": row['scope'],
                     "terms": []
                 }
-            
-            if terms == 1:
-                # Add terms to standard
-                if row['term_id']:
-                    terms_data = {
-                        "termID": row['term_id'],
-                        "term": row['term'],
-                        "termEnglish": row['term_english'],
-                        "definition": row['definition'],
-                        "notes": row['notes'] if row['notes'] else []
-                    }
-                    standards[standard_id]['terms'].append(terms_data)
-        
-        # Convert the standards dict to a list for the response
-        result = list(standards.values())
-        
-        return result
+
+            # 如果需要术语信息，添加到标准中
+            if terms == 1 and row.get('term_id'):
+                terms_data = {
+                    "termID": row['term_id'],
+                    "term": row['term'],
+                    "termEnglish": row['term_english'],
+                    "definition": row['definition'],
+                    "notes": row['notes'] if row['notes'] else []
+                }
+                standards[standard_id]['terms'].append(terms_data)
+
+        # 转换为列表返回
+        return list(standards.values())
 
     except Exception as e:
-        print(f"Error: {e}")
-        return []
+        # 捕获异常并记录日志
+        raise HTTPException(status_code=500, detail=f"Error retrieving standards: {e}")
 
     finally:
         # Ensure the connection is closed even if an error occurs
