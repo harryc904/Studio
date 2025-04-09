@@ -57,20 +57,18 @@ def insert_standard_data(standard: Standard):
             for term in standard.terms
         ]
 
-        # 手动构建批量插入的 SQL 语句
-        term_insert_query = """
-        INSERT INTO terms (standard_id, term_id, term, term_english, definition, notes)
-        VALUES {}
-        """.format(
-            ", ".join(
-                cursor.mogrify("(%s, %s, %s, %s, %s, %s::jsonb)", term).decode("utf-8")
-                for term in term_values
-            )
+        # 批量插入术语信息
+        cursor.executemany(
+            """
+            INSERT INTO terms (standard_id, term_id, term, term_english, definition, notes)
+            VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+            """,
+            term_values
         )
 
-        cursor.execute(term_insert_query)
-
+        # 提交事务
         conn.commit()
+        
     except Exception as e:
         conn.rollback()
         raise e
