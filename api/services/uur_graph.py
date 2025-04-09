@@ -1,9 +1,10 @@
 from typing import List
 from api.utils.db import get_b_db_connection
+from psycopg.rows import dict_row
 
 def fetch_graph_data(type: List[str]) -> dict:
     conn = get_b_db_connection()
-    cur = conn.cursor()
+    cur = conn.cursor(row_factory=dict_row)
     
     try:
         nodes = []
