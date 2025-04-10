@@ -1,6 +1,7 @@
 from typing import List
 from api.utils.db import get_b_db_connection
 from psycopg.rows import dict_row
+from fastapi import HTTPException
 
 def fetch_graph_data(type: List[str]) -> dict:
     conn = get_b_db_connection()
@@ -88,5 +89,49 @@ def fetch_graph_data(type: List[str]) -> dict:
         return {"nodes": nodes, "edges": edges}
 
     finally:
+        cur.close()
+        conn.close()
+
+def fetch_user_story_table():
+    conn = get_b_db_connection()
+    cur = conn.cursor(row_factory=dict_row)
+
+    try:
+        # 查询 userstory 表，并联结 status 和 userjourney 获取对应名称
+        cur.execute("""
+            SELECT 
+                us.us_id, 
+                us.description, 
+                s.status_name, 
+                uj.name AS user_journey_name, 
+                us.valid_vehicle, 
+                us.uuid
+            FROM userstory us
+            LEFT JOIN status s ON us.status_id = s.status_id
+            LEFT JOIN userjourney uj ON us.user_journey_id = uj.user_journey_id
+        """)
+        userstories = cur.fetchall()
+
+        # 处理数据格式
+        result = [
+            {
+                "us_id": f"US-{str(us['us_id']).zfill(6)}",
+                "description": us["description"],
+                "status_name": us["status_name"],
+                "user_journey_name": us["user_journey_name"],
+                "valid_vehicle": us["valid_vehicle"],
+                "uuid": us["uuid"]
+            }
+            for us in userstories
+        ]
+
+        return result
+
+    except Exception as e:
+        # 捕获异常并抛出 HTTP 错误
+        raise HTTPException(status_code=500, detail=f"Error fetching user story table: {e}")
+
+    finally:
+        # 确保游标和连接关闭
         cur.close()
         conn.close()
